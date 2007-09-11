@@ -46,11 +46,15 @@ class PlayerData:
     def examineClauses(self, card):
         for clause in self.possibleCards:
             if (card in clause):
-                clause.remove(card)
-                if (len(clause) == 1):
-                    # We have this card!
-                    self.hasCards.add(card)
+                if (card in self.hasCards):
+                    # We have this card, so this clause is done.
                     self.possibleCards.remove(clause)
+                elif (card in self.notHasCards):
+                    clause.remove(card)
+                    if (len(clause) == 1):
+                        # We have this card!
+                        self.hasCards.add(clause[0])
+                        self.possibleCards.remove(clause)
 
 class ClueEngine:
     cards = {}
@@ -91,6 +95,15 @@ class ClueEngine:
             if (card in self.players[i].hasCards):
                 return i
         return -1
+
+    def playerHasCard(self, playerIndex, card):
+        if (card in self.players[playerIndex].hasCards):
+            return True
+        elif (card in self.players[playerIndex].notHasCards):
+            return False
+        else:
+            # Don't know
+            return -1
 
     def checkSolution(self, card):
         noOneHasCard = True
@@ -145,6 +158,38 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assert_('Knife' not in ce.players[1].hasCards)
         self.assert_('Knife' in ce.players[2].notHasCards)
         self.assert_('Knife' in ce.players[0].notHasCards)
+        self.assertEqual(ce.playerHasCard(1, 'ProfessorPlum'), False)
+        self.assertEqual(ce.playerHasCard(1, 'ColonelMustard'), -1)
+        self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), -1)
+        self.assertEqual(ce.playerHasCard(0, 'ProfessorPlum'), False)
+
+    def testPossibleCards1(self):
+        ce = ClueEngine()
+        self.assertEqual(len(ce.players[3].possibleCards), 0)
+        ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 3, None)
+        self.assertEqual(len(ce.players[3].possibleCards), 1)
+        self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife', 'Hall'])
+        ce.infoOnCard(3, 'Hall', True)
+        self.assertEqual(ce.whoHasCard('Hall'), 3)
+        self.assertEqual(ce.playerHasCard(3, 'Hall'), True)
+        self.assertEqual(len(ce.players[3].possibleCards), 0)
+
+    def testPossibleCards2(self):
+        ce = ClueEngine()
+        self.assertEqual(len(ce.players[3].possibleCards), 0)
+        ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 3, None)
+        self.assertEqual(len(ce.players[3].possibleCards), 1)
+        self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife', 'Hall'])
+        ce.infoOnCard(3, 'Hall', False)
+        self.assertEqual(ce.playerHasCard(3, 'Hall'), False)
+        self.assertEqual(len(ce.players[3].possibleCards), 1)
+        self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife'])
+        ce.infoOnCard(3, 'ProfessorPlum', False)
+        self.assertEqual(ce.playerHasCard(3, 'ProfessorPlum'), False)
+        self.assertEqual(ce.whoHasCard('Knife'), 3)
+        self.assertEqual(ce.playerHasCard(3, 'Knife'), True)
+        self.assertEqual(len(ce.players[3].possibleCards), 0)
+
 
 def main():
     ce = ClueEngine()
