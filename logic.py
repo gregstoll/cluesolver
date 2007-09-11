@@ -189,6 +189,8 @@ class Expr:
         return (other is self) or (isinstance(other, Expr) 
             and self.op == other.op and self.args == other.args)
 
+    def __ne__(self, other):
+        return not (self == other)
     def __hash__(self):
         "Need a hash method so Exprs can live in dicts."
         return hash(self.op) ^ hash(tuple(self.args))
@@ -356,6 +358,7 @@ def tt_check_all(kb, alpha, symbols, model):
         assert result != None
     else:
         P, rest = symbols[0], symbols[1:]
+        print "adding symbol: %s" % P
         return (tt_check_all(kb, alpha, rest, extend(model, P, True)) and
                 tt_check_all(kb, alpha, rest, extend(model, P, False)))
 
