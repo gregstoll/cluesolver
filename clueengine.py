@@ -17,6 +17,7 @@ class PlayerData:
         return "PD(%s,%s,%s)" % (self.hasCards, self.notHasCards, self.possibleCards)
 
     def infoOnCard(self, card, hasCard, updateClueEngine=True):
+        self.clueEngine.validateCard(card)
         if (hasCard):
             self.hasCards.add(card)
         else:
@@ -69,6 +70,9 @@ class ClueEngine:
         self.players[playerIndex].infoOnCard(card, hasCard)
 
     def suggest(self, suggestingPlayer, card1, card2, card3, refutingPlayer, cardShown):
+        self.validateCard(card1)
+        self.validateCard(card2)
+        self.validateCard(card3)
         curPlayer = suggestingPlayer + 1
         if (curPlayer == self.numPlayers):
             curPlayer = 0
@@ -91,12 +95,14 @@ class ClueEngine:
                 curPlayer = 0
 
     def whoHasCard(self, card):
+        self.validateCard(card)
         for i in range(self.numPlayers+1):
             if (card in self.players[i].hasCards):
                 return i
         return -1
 
     def playerHasCard(self, playerIndex, card):
+        self.validateCard(card)
         if (card in self.players[playerIndex].hasCards):
             return True
         elif (card in self.players[playerIndex].notHasCards):
@@ -104,10 +110,18 @@ class ClueEngine:
         else:
             # Don't know
             return -1
+    
+    def validateCard(self, card):
+        for cardtype in self.cards:
+            if card in self.cards[cardtype]:
+                return
+        raise "ERROR - unrecognized card %s" % card
 
     def checkSolution(self, card):
         noOneHasCard = True
         someoneHasCard = False
+        # - Check also for all cards except one in a category are
+        # accounted for.
         for i in range(self.numPlayers):
             if (card in self.players[i].hasCards):
                 # Someone has the card, so the solution is not this
@@ -132,7 +146,30 @@ class ClueEngine:
             for i in range(self.numPlayers + 1):
                 if (card not in self.players[i].hasCards):
                     self.players[i].infoOnCard(card, False, updateClueEngine=False)
-            
+        # Now see if we've deduced a solution.
+        for cardtype in self.cards:
+            allCards = self.cards[cardtype][:]
+            solutionCard = None
+            isSolution = True
+            for testCard in allCards:
+                # See if anyone has this card
+                cardOwned = False
+                for i in range(self.numPlayers):
+                    if (testCard in self.players[i].hasCards):
+                        # someone has it, mark it as such
+                        cardOwned = True
+                if (cardOwned == False):
+                    # If there's another possibility, we don't know which is
+                    # right.
+                    if (solutionCard != None):
+                        solutionCard = None
+                        isSolution = False
+                    else:
+                        solutionCard = testCard
+            if (isSolution):
+                # There's only one possibility, so this must be it!
+                if (solutionCard not in self.players[self.numPlayers].hasCards):
+                    self.players[self.numPlayers].hasCards.add(solutionCard)
 
 class TestCaseClueEngine(unittest.TestCase):
     def setUp(self):
@@ -190,6 +227,15 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ce.playerHasCard(3, 'Knife'), True)
         self.assertEqual(len(ce.players[3].possibleCards), 0)
 
+    def testAllCardsAccountedFor(self):
+        ce = ClueEngine()
+        ce.infoOnCard(0, 'ColonelMustard', True)
+        self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), True)
+        ce.infoOnCard(1, 'MrGreen', True)
+        ce.infoOnCard(2, 'MissScarlet', True)
+        ce.infoOnCard(3, 'MsWhite', True)
+        ce.infoOnCard(4, 'MrsPeacock', True)
+        self.assertEqual(ce.playerHasCard(6, 'ProfessorPlum'), True)
 
 def main():
     ce = ClueEngine()
