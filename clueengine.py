@@ -69,6 +69,8 @@ class ClueEngine:
     def infoOnCard(self, playerIndex, card, hasCard):
         self.players[playerIndex].infoOnCard(card, hasCard)
 
+    # TODO - accusations as well
+    # TODO - simulations as well?
     def suggest(self, suggestingPlayer, card1, card2, card3, refutingPlayer, cardShown):
         self.validateCard(card1)
         self.validateCard(card2)
