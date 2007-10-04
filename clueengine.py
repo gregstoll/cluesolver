@@ -66,6 +66,54 @@ class ClueEngine:
         self.numPlayers = players
         self.players = [PlayerData(self) for i in range(self.numPlayers+1)]
 
+    @classmethod
+    def cardFromChar(cls, char):
+        idx = ord(char) - ord('A')
+        if idx < len(cls.cards['suspect']):
+            return cls.cards['suspect'][idx]
+        idx -= len(cls.cards['suspect'])
+        if idx < len(cls.cards['weapon']):
+            return cls.cards['weapon'][idx]
+        idx -= len(cls.cards['weapon'])
+        if idx < len(cls.cards['room']):
+            return cls.cards['room'][idx]
+        # invalid character
+        return ''
+
+    @classmethod
+    def loadFromString(cls, str):
+        numPlayers = int(str[0])
+        str = str[1:]
+        ce = ClueEngine(numPlayers)
+        for i in range(numPlayers+1):
+            str = cls.loadPlayerFromString(str, i, ce)
+        return (ce, str)
+
+    @classmethod
+    def loadPlayerFromString(cls, str, idx, ce):
+        # Load the list of cards this player has
+        #print "TODO - top is '%s'" % str
+        while (str[0] != '-'):
+            ce.infoOnCard(idx, cls.cardFromChar(str[0]), True)
+            str = str[1:]
+            #print "TODO - top is '%s'" % str
+        str = str[1:]
+        # Load the list of cards this player doesn't have
+        while (str[0] != '-' and str[0] != '.'):
+            ce.infoOnCard(idx, cls.cardFromChar(str[0]), False)
+            str = str[1:]
+        # Load the list of clauses as long as it's not done
+        while str[0] != '.':
+            str = str[1:]
+            clause = []
+            while str[0] != '-' and str[0] != '.':
+                clause.append(cls.cardFromChar(str[0]))
+                str = str[1:]
+            if (len(clause) > 0):
+                ce.players[idx].hasOneOfCards(clause)
+        str = str[1:]
+        return str
+
     def infoOnCard(self, playerIndex, card, hasCard):
         self.players[playerIndex].infoOnCard(card, hasCard)
 
@@ -112,10 +160,11 @@ class ClueEngine:
         else:
             # Don't know
             return -1
-    
-    def validateCard(self, card):
-        for cardtype in self.cards:
-            if card in self.cards[cardtype]:
+
+    @classmethod
+    def validateCard(cls, card):
+        for cardtype in cls.cards:
+            if card in cls.cards[cardtype]:
                 return
         raise "ERROR - unrecognized card %s" % card
 
@@ -239,6 +288,47 @@ class TestCaseClueEngine(unittest.TestCase):
         ce.infoOnCard(4, 'MrsPeacock', True)
         self.assertEqual(ce.playerHasCard(6, 'ProfessorPlum'), True)
 
+    def testCardFromChar(self):
+        self.assertEqual(ClueEngine.cardFromChar('A'), 'ProfessorPlum')
+        self.assertEqual(ClueEngine.cardFromChar('B'), 'ColonelMustard')
+        self.assertEqual(ClueEngine.cardFromChar('F'), 'MrsPeacock')
+        self.assertEqual(ClueEngine.cardFromChar('G'), 'Knife')
+        self.assertEqual(ClueEngine.cardFromChar('L'), 'Wrench')
+        self.assertEqual(ClueEngine.cardFromChar('M'), 'Hall')
+        self.assertEqual(ClueEngine.cardFromChar('U'), 'BilliardRoom')
+        self.assertEqual(ClueEngine.cardFromChar('V'), '')
+        for i in range(ord('A'), ord('V')):
+            ClueEngine.validateCard(ClueEngine.cardFromChar(chr(i)))
+
+    def testLoadFromString(self):
+        (ce, str) = ClueEngine.loadFromString('2AH-BCD-KL-MN.-AH.-.')
+        self.assertEqual(str, '')
+        (ce, str) = ClueEngine.loadFromString('2A-.-.-.')
+        self.assertEqual(str, '')
+        self.assertEqual(len(ce.players[0].hasCards), 1)
+        self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
+        self.assertEqual(len(ce.players[0].notHasCards), 0)
+        self.assertEqual(len(ce.players[1].hasCards), 0)
+        self.assertEqual(len(ce.players[1].notHasCards), 1)
+        self.assertEqual(ce.playerHasCard(1, 'ProfessorPlum'), False)
+        self.assertEqual(len(ce.players[2].hasCards), 0)
+        self.assertEqual(len(ce.players[2].notHasCards), 1)
+        self.assertEqual(ce.playerHasCard(2, 'ProfessorPlum'), False)
+        (ce, str) = ClueEngine.loadFromString('2A-B.L-C.U-.')
+        self.assertEqual(str, '')
+        self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
+        self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), False)
+        self.assert_(ce.playerHasCard(1, 'Wrench'))
+        self.assertEqual(ce.playerHasCard(1, 'MrGreen'), False)
+        self.assert_(ce.playerHasCard(2, 'BilliardRoom'))
+        (ce, str) = ClueEngine.loadFromString('2-.A-B-CDE-FGH.U-.')
+        self.assertEqual(str, '')
+        self.assert_(ce.playerHasCard(1, 'ProfessorPlum'))
+        self.assertEqual(ce.playerHasCard(1, 'ColonelMustard'), False)
+        self.assertEqual(len(ce.players[1].possibleCards), 2)
+        self.assertEqual(ce.players[1].possibleCards[0], [ClueEngine.cardFromChar('C'), ClueEngine.cardFromChar('D'), ClueEngine.cardFromChar('E')])
+        self.assertEqual(ce.players[1].possibleCards[1], [ClueEngine.cardFromChar('F'), ClueEngine.cardFromChar('G'), ClueEngine.cardFromChar('H')])
+        
 def main():
     ce = ClueEngine()
 

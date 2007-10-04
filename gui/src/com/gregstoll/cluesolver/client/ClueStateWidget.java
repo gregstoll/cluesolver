@@ -10,6 +10,7 @@ public class ClueStateWidget extends SimplePanel {
     public static final int STATE_UNKNOWN = 0;
     public static final int STATE_OWNED_BY_PLAYER = 1;
     public static final int STATE_OWNED_BY_CASEFILE = 2;
+    public static ClueSolver solver = null;
 
     public int ownerIndex = -1;
     public int curState = STATE_UNKNOWN;
@@ -38,7 +39,15 @@ public class ClueStateWidget extends SimplePanel {
         setImage();
     }
 
-    public void setImage() {
+    public void setState(int state, int owner) {
+        curState = state;
+        if (curState == STATE_OWNED_BY_PLAYER) {
+            ownerIndex = owner;
+        }
+        setImage();
+    }
+
+    private void setImage() {
         Image i;
         switch (curState) {
             case STATE_UNKNOWN:

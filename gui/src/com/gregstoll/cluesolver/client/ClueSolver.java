@@ -35,6 +35,7 @@ public class ClueSolver implements EntryPoint {
           label.setText("");
       }
     });
+    ClueStateWidget.solver = this;
     for (int i = 0; i < 6; ++i) {
         RootPanel.get("staticSuspect" + (i + 1)).add(new Label(externalNames[0][i]));
         RootPanel.get("suspect" + (i + 1)).add(new ClueStateWidget());
@@ -47,6 +48,9 @@ public class ClueSolver implements EntryPoint {
         RootPanel.get("staticRoom" + (i + 1)).add(new Label(externalNames[2][i]));
         RootPanel.get("room" + (i + 1)).add(new ClueStateWidget());
     }
+
+    getStateWidget("weapon1").setState(ClueStateWidget.STATE_OWNED_BY_CASEFILE, -1);
+    getStateWidget("weapon2").setState(ClueStateWidget.STATE_OWNED_BY_PLAYER, 1);
     
     // Assume that the host HTML has elements defined whose
     // IDs are "slot1", "slot2".  In a real app, you probably would not want
@@ -54,5 +58,9 @@ public class ClueSolver implements EntryPoint {
     // elements with a particular CSS class and replace them with widgets.
     //
     //RootPanel.get("table").add(g);
+  }
+
+  public ClueStateWidget getStateWidget(String id) {
+      return ((ClueStateWidget)RootPanel.get(id).getWidget(0));
   }
 }
