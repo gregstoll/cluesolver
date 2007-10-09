@@ -20,13 +20,14 @@ import com.google.gwt.user.client.ui.Tree;
 import com.google.gwt.user.client.ui.TreeItem;
 import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.gwt.user.client.ui.Widget;
-import com.google.gwt.xml.client.Document;
-import com.google.gwt.xml.client.DOMException;
-import com.google.gwt.xml.client.Node;
-import com.google.gwt.xml.client.NodeList;
-import com.google.gwt.xml.client.XMLParser;
+import com.google.gwt.json.client.JSONArray;
+import com.google.gwt.json.client.JSONParser;
+import com.google.gwt.json.client.JSONString;
+import com.google.gwt.json.client.JSONObject;
+import com.google.gwt.json.client.JSONValue;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Entry point classes define <code>onModuleLoad()</code>.
@@ -57,28 +58,32 @@ public class ClueSolver implements EntryPoint {
     }
   }*/
 
-  public String getChildTextFromNode(Node n) {
-    Node textNode = n.getFirstChild();
-    textNode.normalize();
-    return textNode.getNodeValue();
-  }
-
   CgiResponseHandler newInfoHandler = new CgiResponseHandler() {
       public void onSuccess(String body) {
-        try {
-            Document response = XMLParser.parse(body);
-            Node errorStatus = response.getElementsByTagName("errorStatus").item(0);
-            if (errorStatus.getFirstChild().getNodeValue() != "0") {
-                Window.alert("Internal error - error returned from script - " + getChildTextFromNode(response.getElementsByTagName("errorText").item(0)));
-            } else {
+        JSONObject response = JSONParser.parse(body).isObject();
+        double errorStatus = response.get("errorStatus").isNumber().getValue();
+        if (errorStatus != 0.0) {
+            Window.alert("Internal error - error returned from script - " + response.get("errorText").isString().toString());
+        } else {
+            curSessionString = response.get("session").isString().stringValue();
+            JSONArray newInfos = response.get("newInfo").isArray();
+            int numElements = newInfos.size();
+            for (int i = 0; i < numElements; ++i) {
+                JSONObject curInfo = newInfos.get(i).isObject();
+                String card = curInfo.get("card").isString().stringValue();
+                int status = (int) curInfo.get("status").isNumber().getValue();
+                int owner = -1;
+                if (status == 1) {
+                    owner = (int) curInfo.get("owner").isNumber().getValue();
+                }
+                getStateWidget(card).setState(status, owner);
+            }
                 /*NodeList newInfoNodes = response.getElementsByTagName("newInfo");
                 for (int i = 0; i < newInfoNodes.getLength(); ++i) {
                     Node curNode = newInfoNodes.item(i);
-                    String card = getChildTextFromNode(curNode.getElementsByTagName("card").item(0));
+                    //String card = getChildTextFromNode(curNode.getElementsByTagName("card").item(0));
+                    String card = getChildTextFromNode((Node) curNode.getNodes("card").get(0));
                 }*/
-            }
-        } catch (DOMException ex) {
-            Window.alert("Internal error - unable to parse response (message is " + ex.getMessage() + ") - " + body);
         }
       }
       public void onError(Throwable ex) {
@@ -170,7 +175,7 @@ public class ClueSolver implements EntryPoint {
     whoOwnsCardPanel.add(tempPanel1);
     Button whoOwnsSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
-            CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=whoOwns&owner=" + ownerOwned.getValue(ownerOwned.getSelectedIndex()) + "&card=" + whichCardOwned.getValue(whichCardOwned.getSelectedIndex()), newInfoHandler);
+            CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=whoOwns&owner=" + ownerOwned.getValue(ownerOwned.getSelectedIndex()) + "&card=" + whichCardOwned.getValue(whichCardOwned.getSelectedIndex()), newInfoHandler);
         }
     });
     whoOwnsCardPanel.add(whoOwnsSubmitButton);
@@ -217,7 +222,13 @@ public class ClueSolver implements EntryPoint {
     // Get the state of the game.
     CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=new&players=6", new CgiResponseHandler() {
         public void onSuccess(String body) {
-            curSessionString = body;
+            JSONObject response = JSONParser.parse(body).isObject();
+            double errorStatus = response.get("errorStatus").isNumber().getValue();
+            if (errorStatus != 0.0) {
+                Window.alert("Internal error - error returned from script - " + response.get("errorText").isString().toString());
+            } else {
+                curSessionString = response.get("session").isString().stringValue();
+            }
         }
         public void onError(Throwable ex) {
             Window.alert("Internal error - unable to contact backend for new session - " + ex.getMessage());
