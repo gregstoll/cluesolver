@@ -34,7 +34,7 @@ class PlayerData:
                 if (card in self.clueEngine.cards[cardType]):
                     for otherCard in self.clueEngine.cards[cardType]:
                         if (otherCard != card):
-                            changedCards.update(self.infoOnCard(otherCard, False, True))
+                            changedCards.update(self.infoOnCard(otherCard, False))
         return changedCards
 
     def hasOneOfCards(self, cards):
@@ -231,29 +231,22 @@ class ClueEngine:
 
     def checkSolution(self, card):
         changedCards = set()
-        noOneHasCard = True
         someoneHasCard = False
+        numWhoDontHaveCard = 0
+        playerWhoMightHaveCard = -1
         # - Check also for all cards except one in a category are
         # accounted for.
-        for i in range(self.numPlayers):
+        for i in range(self.numPlayers + 1):
             if (card in self.players[i].hasCards):
                 # Someone has the card, so the solution is not this
-                changedCards.update(self.players[self.numPlayers].infoOnCard(card, False, updateClueEngine=False))
                 someoneHasCard = True
-                noOneHasCard = False
             elif (card in self.players[i].notHasCards):
-                pass
+                numWhoDontHaveCard += 1
             else:
-                noOneHasCard = False
-        if (noOneHasCard):
-            # Solution - no one has this card!
-            changedCards.update(self.players[self.numPlayers].infoOnCard(card, True, updateClueEngine=False))
-            # update notHasCard for everything else in this category
-            for cardType in self.cards:
-                if (card in self.cards[cardType]):
-                    for otherCard in self.cards[cardType]:
-                        if (otherCard != card):
-                            changedCards.update(self.players[self.numPlayers].infoOnCard(otherCard, False))
+                playerWhoMightHaveCard = i
+        if ((not someoneHasCard) and (numWhoDontHaveCard == self.numPlayers)):
+            # Every player except one doesn't have this card, so we know the player has it.
+            changedCards.update(self.players[playerWhoMightHaveCard].infoOnCard(card, True, updateClueEngine=False))
         elif (someoneHasCard):
             # Someone has this card, so no one else does. (including solution)
             for i in range(self.numPlayers + 1):
@@ -386,13 +379,6 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(cc, self.makeSet('MrGreen'))
         cc = ce.infoOnCard(4, 'MrGreen', False)
         self.assertEqual(cc, self.makeSet('MrGreen'))
-        print ce.players[0]
-        print ce.players[1]
-        print ce.players[2]
-        print ce.players[3]
-        print ce.players[4]
-        print ce.players[5]
-        print ce.players[6]
         self.assertEqual(ce.playerHasCard(5, 'MrGreen'), True)
 
 
@@ -453,7 +439,7 @@ class TestCaseClueEngine(unittest.TestCase):
     def testWriteToString(self):
         str = '2AH-BCD-KL-MN.-AH.-AH.'
         self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
-        str = '2-A.A-B-CDE-FGH.U-ANSQRTOMP.'
+        str = '2-AU.A-BU-CDE-FGH.U-ANSQRTOMP.'
         self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
 
 def main():
