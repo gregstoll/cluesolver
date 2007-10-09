@@ -1,8 +1,8 @@
 <module>
 
 	<!-- Inherit the core Web Toolkit stuff.                  -->
-	<inherits name='com.google.gwt.user.User'/>
-	<inherits name='com.google.gwt.http.HTTP'/>
+    <inherits name='com.google.gwt.user.User'/>
+	<inherits name="com.google.gwt.http.HTTP"/>
 
 	<!-- Specify the app entry point class.                   -->
 	<entry-point class='com.gregstoll.cluesolver.client.ClueSolver'/>

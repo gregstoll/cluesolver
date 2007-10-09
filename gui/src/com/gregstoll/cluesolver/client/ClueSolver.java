@@ -1,6 +1,9 @@
 package com.gregstoll.cluesolver.client;
 
 import com.google.gwt.core.client.EntryPoint;
+import com.google.gwt.http.client.RequestBuilder;
+import com.google.gwt.http.client.URL;
+import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.ClickListener;
 import com.google.gwt.user.client.ui.FlowPanel;
@@ -8,12 +11,17 @@ import com.google.gwt.user.client.ui.Grid;
 import com.google.gwt.user.client.ui.HorizontalPanel;
 import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.Label;
+import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.PopupPanel;
 import com.google.gwt.user.client.ui.RadioButton;
 import com.google.gwt.user.client.ui.RootPanel;
 import com.google.gwt.user.client.ui.TabPanel;
+import com.google.gwt.user.client.ui.Tree;
+import com.google.gwt.user.client.ui.TreeItem;
 import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.gwt.user.client.ui.Widget;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Entry point classes define <code>onModuleLoad()</code>.
@@ -29,7 +37,11 @@ public class ClueSolver implements EntryPoint {
 
   public String[] playerNames = {"Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6"};
   public VerticalPanel namesPanel = null;
-  private static class TestPopup extends PopupPanel {
+  public HashMap internalNameToClueStateWidgetMap = new HashMap();
+  private ArrayList playerListBoxes = new ArrayList();
+  public static final String scriptName = "clue.cgi";
+  public String curSessionString = null;
+  /*private static class TestPopup extends PopupPanel {
     public TestPopup(String s) {
         super(true);
         HTML contents = new HTML(s);
@@ -38,7 +50,7 @@ public class ClueSolver implements EntryPoint {
 
         setStyleName("ks-popups-Popup");
     }
-  }
+  }*/
 
   /**
    * This is the entry point method.
@@ -94,31 +106,93 @@ public class ClueSolver implements EntryPoint {
     }
     playerInfoPanel.add(namesPanel);
 
-    VerticalPanel gameInfoPanel = new VerticalPanel();
+    HorizontalPanel gameInfoPanel = new HorizontalPanel();
     gameInfoPanel.setHorizontalAlignment(VerticalPanel.ALIGN_LEFT);
     gameInfoPanel.setVerticalAlignment(HorizontalPanel.ALIGN_TOP);
-    gameInfoPanel.add(new HTML("TODO"));
+
+    Tree infoTree = new Tree();
+    TreeItem suspectTree = new TreeItem("Suspects");
+    for (int i = 0; i < internalNames[0].length; ++i) {
+        suspectTree.addItem(new ClueStateWidget(internalNames[0][i], externalNames[0][i]));
+    }
+    TreeItem weaponTree = new TreeItem("Weapons");
+    for (int i = 0; i < internalNames[1].length; ++i) {
+        weaponTree.addItem(new ClueStateWidget(internalNames[1][i], externalNames[1][i]));
+    }
+    TreeItem roomTree = new TreeItem("Rooms");
+    for (int i = 0; i < internalNames[2].length; ++i) {
+        roomTree.addItem(new ClueStateWidget(internalNames[2][i], externalNames[2][i]));
+    }
+    infoTree.addItem(suspectTree);
+    infoTree.addItem(weaponTree);
+    infoTree.addItem(roomTree);
+    suspectTree.setState(true);
+    weaponTree.setState(true);
+    roomTree.setState(true);
+    gameInfoPanel.add(infoTree);
+
+    VerticalPanel enterInfoPanel = new VerticalPanel();
+    enterInfoPanel.add(new HTML("Enter new info:")); 
+    TabPanel enterInfoTabs = new TabPanel();
+    VerticalPanel whoOwnsCardPanel = new VerticalPanel();
+    HorizontalPanel tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Card: "));
+    tempPanel1.add(makeNewCardListBox(-1, false));
+    whoOwnsCardPanel.add(tempPanel1);
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Owned by: "));
+    tempPanel1.add(makeNewPlayerListBox(false));
+    whoOwnsCardPanel.add(tempPanel1);
+    enterInfoTabs.add(whoOwnsCardPanel, "Who owns a card");
+    VerticalPanel suggestionMadePanel = new VerticalPanel();
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Made by: "));
+    tempPanel1.add(makeNewPlayerListBox(false));
+    suggestionMadePanel.add(tempPanel1);
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Suspect: "));
+    tempPanel1.add(makeNewCardListBox(0, false));
+    suggestionMadePanel.add(tempPanel1);
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Weapon: "));
+    tempPanel1.add(makeNewCardListBox(1, false));
+    suggestionMadePanel.add(tempPanel1);
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Room: "));
+    tempPanel1.add(makeNewCardListBox(2, false));
+    suggestionMadePanel.add(tempPanel1);
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Refuted by: "));
+    tempPanel1.add(makeNewPlayerListBox(true));
+    suggestionMadePanel.add(tempPanel1);
+    tempPanel1 = new HorizontalPanel();
+    tempPanel1.add(new HTML("Refuting card: "));
+    tempPanel1.add(makeNewCardListBox(-1, true));
+    suggestionMadePanel.add(tempPanel1);
+    enterInfoTabs.add(suggestionMadePanel, "Suggestion made");
+
+    enterInfoTabs.selectTab(0);
+    enterInfoPanel.add(enterInfoTabs);
+    gameInfoPanel.add(enterInfoPanel);
+
     TabPanel tabs = new TabPanel();
     tabs.add(playerInfoPanel, "Player Info");
     tabs.add(gameInfoPanel, "Game Info");
     tabs.selectTab(0);
     RootPanel.get().add(tabs);
-    /*for (int i = 0; i < 6; ++i) {
-        RootPanel.get("staticSuspect" + (i + 1)).add(new Label(externalNames[0][i]));
-        RootPanel.get("suspect" + (i + 1)).add(new ClueStateWidget());
-    }
-    for (int i = 0; i < 6; ++i) {
-        RootPanel.get("staticWeapon" + (i + 1)).add(new Label(externalNames[1][i]));
-        RootPanel.get("weapon" + (i + 1)).add(new ClueStateWidget());
-    }
-    for (int i = 0; i < 9; ++i) {
-        RootPanel.get("staticRoom" + (i + 1)).add(new Label(externalNames[2][i]));
-        RootPanel.get("room" + (i + 1)).add(new ClueStateWidget());
-    }
 
-    getStateWidget("weapon1").setState(ClueStateWidget.STATE_OWNED_BY_CASEFILE, -1);
-    getStateWidget("weapon2").setState(ClueStateWidget.STATE_OWNED_BY_PLAYER, 1);*/
-     
+    getStateWidget("ProfessorPlum").setState(ClueStateWidget.STATE_OWNED_BY_CASEFILE, -1);
+    getStateWidget("ColonelMustard").setState(ClueStateWidget.STATE_OWNED_BY_PLAYER, 1);
+    // Get the state of the game.
+    CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=new&players=6", new CgiResponseHandler() {
+        public void onSuccess(String body) {
+            curSessionString = body;
+            //Window.alert("got response - " + body);
+        }
+        public void onError(Throwable ex) {
+            Window.alert("Internal error - unable to contact backend for new session - " + ex.getMessage());
+        }
+    });
      
     // Assume that the host HTML has elements defined whose
     // IDs are "slot1", "slot2".  In a real app, you probably would not want
@@ -154,6 +228,52 @@ public class ClueSolver implements EntryPoint {
   }
 
   public ClueStateWidget getStateWidget(String id) {
-      return ((ClueStateWidget)RootPanel.get(id).getWidget(0));
+      return (ClueStateWidget) internalNameToClueStateWidgetMap.get(id);
+      //return ((ClueStateWidget)RootPanel.get(id).getWidget(0));
   }
+
+  public ListBox makeNewCardListBox(int index, boolean includeNoneUnknown) {
+      ListBox toReturn = new ListBox();
+      if (includeNoneUnknown) {
+          toReturn.addItem("None/Unknown", "None");
+      }
+      if (index == -1) {
+        for (int i = 0; i < externalNames.length; ++i) {
+            for (int j = 0; j < externalNames[i].length; ++j) {
+                toReturn.addItem(externalNames[i][j], internalNames[i][j]);
+            }
+        }
+      } else {
+        for (int i = 0; i < externalNames[index].length; ++i) {
+            toReturn.addItem(externalNames[index][i], internalNames[index][i]);
+        }
+      }
+      return toReturn;
+  }
+
+  public ListBox makeNewPlayerListBox(boolean includeNone) {
+      ListBox toReturn = new ListBox();
+      if (includeNone) {
+          toReturn.addItem("None", "-1");
+      }
+      for (int i = 0; i < playerNames.length; ++i) {
+          toReturn.addItem(playerNames[i], new Integer(i).toString());
+      }
+      playerListBoxes.add(toReturn);
+      return toReturn;
+  }
+
+  public void changePlayerName(int index, String newName) {
+      playerNames[index] = newName;
+      for (int i = 0; i < playerListBoxes.size(); ++i) {
+        ListBox listBox = ((ListBox) playerListBoxes.get(i));
+        // See if we start with an extra item.
+        int curIndex = index;
+        if (listBox.getValue(0).equals("-1")) {
+            ++curIndex;
+        }
+        listBox.setItemText(curIndex, newName);
+      }
+  }
+
 }

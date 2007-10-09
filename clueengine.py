@@ -81,6 +81,23 @@ class ClueEngine:
         return ''
 
     @classmethod
+    def charFromCard(cls, card):
+        idx = 0
+        if (card in cls.cards['suspect']):
+            idx += cls.cards['suspect'].index(card)
+            return chr(idx + ord('A'))
+        idx += len(cls.cards['suspect'])
+        if (card in cls.cards['weapon']):
+            idx += cls.cards['weapon'].index(card)
+            return chr(idx + ord('A'))
+        idx += len(cls.cards['weapon'])
+        if (card in cls.cards['room']):
+            idx += cls.cards['room'].index(card)
+            return chr(idx + ord('A'))
+        # invalid card
+        return ''
+
+    @classmethod
     def loadFromString(cls, str):
         numPlayers = int(str[0])
         str = str[1:]
@@ -88,6 +105,13 @@ class ClueEngine:
         for i in range(numPlayers+1):
             str = cls.loadPlayerFromString(str, i, ce)
         return (ce, str)
+
+    def writeToString(self):
+        str = ''
+        str += '%d' % self.numPlayers
+        for i in range(self.numPlayers+1):
+            str += self.writePlayerToString(i)
+        return str
 
     @classmethod
     def loadPlayerFromString(cls, str, idx, ce):
@@ -112,6 +136,26 @@ class ClueEngine:
             if (len(clause) > 0):
                 ce.players[idx].hasOneOfCards(clause)
         str = str[1:]
+        return str
+
+    def writePlayerToString(self, idx):
+        str = ''
+        for card in self.players[idx].hasCards:
+            str += ClueEngine.charFromCard(card)
+        str += '-'
+        for card in self.players[idx].notHasCards:
+            str += ClueEngine.charFromCard(card)
+        if (len(self.players[idx].possibleCards) == 0):
+            str += '.'
+            return str
+        str += '-'
+        for possibleCardGroup in self.players[idx].possibleCards:
+            for card in possibleCardGroup:
+                str += ClueEngine.charFromCard(card)
+            str += '-'
+        # But we want a . at the end, not -
+        str = str[:-1]
+        str += '.'
         return str
 
     def infoOnCard(self, playerIndex, card, hasCard):
@@ -300,6 +344,19 @@ class TestCaseClueEngine(unittest.TestCase):
         for i in range(ord('A'), ord('V')):
             ClueEngine.validateCard(ClueEngine.cardFromChar(chr(i)))
 
+    def testCharFromCard(self):
+        self.assertEqual(ClueEngine.charFromCard('ProfessorPlum'), 'A')
+        self.assertEqual(ClueEngine.charFromCard('ColonelMustard'), 'B')
+        self.assertEqual(ClueEngine.charFromCard('MrsPeacock'), 'F')
+        self.assertEqual(ClueEngine.charFromCard('Knife'), 'G')
+        self.assertEqual(ClueEngine.charFromCard('Wrench'), 'L')
+        self.assertEqual(ClueEngine.charFromCard('Hall'), 'M')
+        self.assertEqual(ClueEngine.charFromCard('BilliardRoom'), 'U')
+        self.assertEqual(ClueEngine.charFromCard('InvalidCard'), '')
+        for i in range(ord('A'), ord('V')):
+            self.assertEqual(chr(i), ClueEngine.charFromCard(ClueEngine.cardFromChar(chr(i))))
+
+
     def testLoadFromString(self):
         (ce, str) = ClueEngine.loadFromString('2AH-BCD-KL-MN.-AH.-.')
         self.assertEqual(str, '')
@@ -328,7 +385,13 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(len(ce.players[1].possibleCards), 2)
         self.assertEqual(ce.players[1].possibleCards[0], [ClueEngine.cardFromChar('C'), ClueEngine.cardFromChar('D'), ClueEngine.cardFromChar('E')])
         self.assertEqual(ce.players[1].possibleCards[1], [ClueEngine.cardFromChar('F'), ClueEngine.cardFromChar('G'), ClueEngine.cardFromChar('H')])
-        
+       
+    def testWriteToString(self):
+        str = '2AH-BCD-KL-MN.-AH.-AH.'
+        self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
+        str = '2-A.A-B-CDE-FGH.U-A.'
+        self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
+
 def main():
     ce = ClueEngine()
 
