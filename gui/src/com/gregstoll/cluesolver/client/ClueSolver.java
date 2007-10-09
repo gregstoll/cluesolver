@@ -20,6 +20,11 @@ import com.google.gwt.user.client.ui.Tree;
 import com.google.gwt.user.client.ui.TreeItem;
 import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.gwt.user.client.ui.Widget;
+import com.google.gwt.xml.client.Document;
+import com.google.gwt.xml.client.DOMException;
+import com.google.gwt.xml.client.Node;
+import com.google.gwt.xml.client.NodeList;
+import com.google.gwt.xml.client.XMLParser;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -27,7 +32,7 @@ import java.util.HashMap;
  * Entry point classes define <code>onModuleLoad()</code>.
  */
 public class ClueSolver implements EntryPoint {
-
+    // TODO - xml code from http://groups.google.com/group/Google-Web-Toolkit/browse_frm/thread/e77f05af3ea4d732/558f817b7741e24f?lnk=gst&q=xpath&rnum=10#558f817b7741e24f
   public static final String[][] internalNames = {{"ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"},
                                     {"Knife", "Candlestick", "Revolver", "LeadPipe", "Rope", "Wrench"},
                                     {"Hall", "Conservatory", "DiningRoom", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "BilliardRoom"}};
@@ -52,21 +57,39 @@ public class ClueSolver implements EntryPoint {
     }
   }*/
 
+  public String getChildTextFromNode(Node n) {
+    Node textNode = n.getFirstChild();
+    textNode.normalize();
+    return textNode.getNodeValue();
+  }
+
+  CgiResponseHandler newInfoHandler = new CgiResponseHandler() {
+      public void onSuccess(String body) {
+        try {
+            Document response = XMLParser.parse(body);
+            Node errorStatus = response.getElementsByTagName("errorStatus").item(0);
+            if (errorStatus.getFirstChild().getNodeValue() != "0") {
+                Window.alert("Internal error - error returned from script - " + getChildTextFromNode(response.getElementsByTagName("errorText").item(0)));
+            } else {
+                /*NodeList newInfoNodes = response.getElementsByTagName("newInfo");
+                for (int i = 0; i < newInfoNodes.getLength(); ++i) {
+                    Node curNode = newInfoNodes.item(i);
+                    String card = getChildTextFromNode(curNode.getElementsByTagName("card").item(0));
+                }*/
+            }
+        } catch (DOMException ex) {
+            Window.alert("Internal error - unable to parse response (message is " + ex.getMessage() + ") - " + body);
+        }
+      }
+      public void onError(Throwable ex) {
+        Window.alert("Internal error - unable to contact backend - " + ex.getMessage());
+      }
+  };
+
   /**
    * This is the entry point method.
    */
   public void onModuleLoad() {
-    final Button button = new Button("Click me");
-    final Label label = new Label();
-
-    button.addClickListener(new ClickListener() {
-      public void onClick(Widget sender) {
-        if (label.getText().equals(""))
-          label.setText("Hello World!");
-        else
-          label.setText("");
-      }
-    });
     ClueStateWidget.solver = this;
 
     VerticalPanel playerInfoPanel = new VerticalPanel();
@@ -137,17 +160,25 @@ public class ClueSolver implements EntryPoint {
     VerticalPanel whoOwnsCardPanel = new VerticalPanel();
     HorizontalPanel tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Card: "));
-    tempPanel1.add(makeNewCardListBox(-1, false));
+    final ListBox whichCardOwned = makeNewCardListBox(-1, false);
+    tempPanel1.add(whichCardOwned);
     whoOwnsCardPanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Owned by: "));
-    tempPanel1.add(makeNewPlayerListBox(false));
+    final ListBox ownerOwned = makeNewPlayerListBox(false, true);
+    tempPanel1.add(ownerOwned);
     whoOwnsCardPanel.add(tempPanel1);
+    Button whoOwnsSubmitButton = new Button("Add info", new ClickListener() {
+        public void onClick(Widget sender) {
+            CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=whoOwns&owner=" + ownerOwned.getValue(ownerOwned.getSelectedIndex()) + "&card=" + whichCardOwned.getValue(whichCardOwned.getSelectedIndex()), newInfoHandler);
+        }
+    });
+    whoOwnsCardPanel.add(whoOwnsSubmitButton);
     enterInfoTabs.add(whoOwnsCardPanel, "Who owns a card");
     VerticalPanel suggestionMadePanel = new VerticalPanel();
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Made by: "));
-    tempPanel1.add(makeNewPlayerListBox(false));
+    tempPanel1.add(makeNewPlayerListBox(false, false));
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Suspect: "));
@@ -163,7 +194,7 @@ public class ClueSolver implements EntryPoint {
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Refuted by: "));
-    tempPanel1.add(makeNewPlayerListBox(true));
+    tempPanel1.add(makeNewPlayerListBox(true, false));
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Refuting card: "));
@@ -181,13 +212,12 @@ public class ClueSolver implements EntryPoint {
     tabs.selectTab(0);
     RootPanel.get().add(tabs);
 
-    getStateWidget("ProfessorPlum").setState(ClueStateWidget.STATE_OWNED_BY_CASEFILE, -1);
-    getStateWidget("ColonelMustard").setState(ClueStateWidget.STATE_OWNED_BY_PLAYER, 1);
+    /*getStateWidget("ProfessorPlum").setState(ClueStateWidget.STATE_OWNED_BY_CASEFILE, -1);
+    getStateWidget("ColonelMustard").setState(ClueStateWidget.STATE_OWNED_BY_PLAYER, 1);*/
     // Get the state of the game.
     CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=new&players=6", new CgiResponseHandler() {
         public void onSuccess(String body) {
             curSessionString = body;
-            //Window.alert("got response - " + body);
         }
         public void onError(Throwable ex) {
             Window.alert("Internal error - unable to contact backend for new session - " + ex.getMessage());
@@ -251,13 +281,16 @@ public class ClueSolver implements EntryPoint {
       return toReturn;
   }
 
-  public ListBox makeNewPlayerListBox(boolean includeNone) {
+  public ListBox makeNewPlayerListBox(boolean includeNone, boolean includeSolution) {
       ListBox toReturn = new ListBox();
       if (includeNone) {
           toReturn.addItem("None", "-1");
       }
       for (int i = 0; i < playerNames.length; ++i) {
           toReturn.addItem(playerNames[i], new Integer(i).toString());
+      }
+      if (includeSolution) {
+          toReturn.addItem("Solution (case file)", new Integer(playerNames.length).toString());
       }
       playerListBoxes.add(toReturn);
       return toReturn;

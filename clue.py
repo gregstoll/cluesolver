@@ -37,3 +37,11 @@ else:
 if (action == 'new'):
     # This is all we have to do.
     success('<session>%s</session>' % engine.writeToString())
+if (action == 'whoOwns'):
+    # See who owns what.
+    if (not form.has_key('owner') or not form.has_key('card')):
+        error("Internal error: action=whoOwns, missing owner or card!")
+    owner = int(form.getfirst('owner'))
+    card = form.getfirst('card')
+    engine.infoOnCard(owner, card, True)
+    success('<newInfo><card>%s</card><status>1</status><owner>%d</owner></newInfo><session>%s</session>' % (card, owner, engine.writeToString()))
