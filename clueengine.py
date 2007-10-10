@@ -39,17 +39,22 @@ class PlayerData:
 
     def hasOneOfCards(self, cards):
         changedCards = set()
-        newClause = cards
-        for card in newClause:
+        newClause = [] 
+        clauseHelpful = True
+        for card in cards:
             if (card in self.hasCards):
                 # We already know player has one of these cards, so this
                 # clause is worthless.
                 newClause = []
+                clauseHelpful = False
             elif (card in self.notHasCards):
-                # We know player doesn't have this card, so remove this card
-                # from the clause
-                newClause.remove(card)
-        if (len(newClause) > 0):
+                # We know player doesn't have this card, so don't add this card
+                # to the new clause.
+                pass
+            else:
+                # Don't know - add it to the clause.
+                newClause.append(card)
+        if (clauseHelpful and len(newClause) > 0):
             if (len(newClause) == 1):
                 # We have learned player has this card!
                 changedCards.update(self.infoOnCard(newClause[0], True))
@@ -82,6 +87,11 @@ class ClueEngine:
         self.numPlayers = players
         self.players = [PlayerData(self, (i == self.numPlayers)) for i in range(self.numPlayers+1)]
 
+    def __repr__(self):
+        return "Engine:\n" + "\n".join([repr(x) for x in self.players])
+
+    def __str__(self):
+        return repr(self)
     @classmethod
     def cardFromChar(cls, char):
         idx = ord(char) - ord('A')
@@ -132,11 +142,9 @@ class ClueEngine:
     @classmethod
     def loadPlayerFromString(cls, str, idx, ce):
         # Load the list of cards this player has
-        #print "TODO - top is '%s'" % str
         while (str[0] != '-'):
             ce.infoOnCard(idx, cls.cardFromChar(str[0]), True)
             str = str[1:]
-            #print "TODO - top is '%s'" % str
         str = str[1:]
         # Load the list of cards this player doesn't have
         while (str[0] != '-' and str[0] != '.'):
@@ -207,10 +215,13 @@ class ClueEngine:
 
     def whoHasCard(self, card):
         self.validateCard(card)
+        possibleOwners = []
         for i in range(self.numPlayers+1):
             if (card in self.players[i].hasCards):
-                return i
-        return -1
+                return [i]
+            elif (card not in self.players[i].notHasCards):
+                possibleOwners.append(i)
+        return possibleOwners
 
     def playerHasCard(self, playerIndex, card):
         self.validateCard(card)
@@ -321,12 +332,13 @@ class TestCaseClueEngine(unittest.TestCase):
         ce = ClueEngine()
         self.assertEqual(len(ce.players[3].possibleCards), 0)
         cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 3, None)
+        self.assertEqual(ce.whoHasCard('ProfessorPlum'), [0,3,4,5,6])
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife', 'Hall'))
         self.assertEqual(len(ce.players[3].possibleCards), 1)
         self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife', 'Hall'])
         cc = ce.infoOnCard(3, 'Hall', True)
         self.assertEqual(cc, self.makeSet('Hall'))
-        self.assertEqual(ce.whoHasCard('Hall'), 3)
+        self.assertEqual(ce.whoHasCard('Hall'), [3])
         self.assertEqual(ce.playerHasCard(3, 'Hall'), True)
         self.assertEqual(len(ce.players[3].possibleCards), 0)
 
@@ -345,7 +357,7 @@ class TestCaseClueEngine(unittest.TestCase):
         cc = ce.infoOnCard(3, 'ProfessorPlum', False)
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife'))
         self.assertEqual(ce.playerHasCard(3, 'ProfessorPlum'), False)
-        self.assertEqual(ce.whoHasCard('Knife'), 3)
+        self.assertEqual(ce.whoHasCard('Knife'), [3])
         self.assertEqual(ce.playerHasCard(3, 'Knife'), True)
         self.assertEqual(len(ce.players[3].possibleCards), 0)
 

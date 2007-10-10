@@ -17,7 +17,7 @@ public class ClueStateWidget extends HorizontalPanel {
     public String privateName = null;
     public String publicName = null;
 
-    public int ownerIndex = -1;
+    public int[] ownerIndices = {};
     public int curState = STATE_UNKNOWN;
 
     public interface Images extends ImageBundle {
@@ -52,25 +52,52 @@ public class ClueStateWidget extends HorizontalPanel {
         solver.internalNameToClueStateWidgetMap.put(privateName, this);
     }
 
-    public void setState(int state, int owner) {
+    public void setState(int state, int[] owners) {
         curState = state;
-        if (curState == STATE_OWNED_BY_PLAYER) {
-            ownerIndex = owner;
+        if (owners != null) {
+            ownerIndices = new int[owners.length];
+            for (int i = 0; i < ownerIndices.length; ++i) {
+                ownerIndices[i] = owners[i];
+            }
         }
         setImage();
     }
 
-    private void setImage() {
+    private String getOwnedByString() {
+        if (ownerIndices.length == 0) {
+            return "???";
+        }
+        // Yeah, we should build this up in a 
+        StringBuffer buffer = new StringBuffer();
+        for (int i = 0; i < ownerIndices.length; ++i) {
+            String ownerName;
+            int curIndex = ownerIndices[i];
+            if (curIndex == solver.playerNames.length) {
+                ownerName = "(solution)";
+            } else {
+                ownerName = solver.playerNames[curIndex];
+            }
+            buffer.append(ownerName);
+            if (i < ownerIndices.length - 1) {
+                buffer.append(" or ");
+            }
+        }
+        return buffer.toString();
+    }
+
+    public void setImage() {
         switch (curState) {
             case STATE_UNKNOWN:
                 images.unknown().applyTo(curImage);
-                curImage.setTitle("Unknown");
+                if (ownerIndices.length > 0) {
+                    curImage.setTitle("Owned by " + getOwnedByString());
+                } else {
+                    curImage.setTitle("Unknown");
+                }
                 break;
             case STATE_OWNED_BY_PLAYER:
                 images.ownedByPlayer().applyTo(curImage);
-                // TODO - check for invalid here
-                // TODO - update this when name changes - ugh
-                curImage.setTitle("Owned by " + solver.playerNames[ownerIndex]);
+                curImage.setTitle("Owned by " + getOwnedByString());
                 break;
             default:
                 // STATE_OWNED_BY_CASEFILE

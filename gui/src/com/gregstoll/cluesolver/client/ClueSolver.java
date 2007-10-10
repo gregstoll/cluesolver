@@ -27,13 +27,15 @@ import com.google.gwt.json.client.JSONObject;
 import com.google.gwt.json.client.JSONValue;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Entry point classes define <code>onModuleLoad()</code>.
  */
 public class ClueSolver implements EntryPoint {
-    // TODO - xml code from http://groups.google.com/group/Google-Web-Toolkit/browse_frm/thread/e77f05af3ea4d732/558f817b7741e24f?lnk=gst&q=xpath&rnum=10#558f817b7741e24f
   public static final String[][] internalNames = {{"ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"},
                                     {"Knife", "Candlestick", "Revolver", "LeadPipe", "Rope", "Wrench"},
                                     {"Hall", "Conservatory", "DiningRoom", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "BilliardRoom"}};
@@ -72,18 +74,13 @@ public class ClueSolver implements EntryPoint {
                 JSONObject curInfo = newInfos.get(i).isObject();
                 String card = curInfo.get("card").isString().stringValue();
                 int status = (int) curInfo.get("status").isNumber().getValue();
-                int owner = -1;
-                if (status == 1) {
-                    owner = (int) curInfo.get("owner").isNumber().getValue();
+                JSONArray ownerArray = curInfo.get("owner").isArray();
+                int[] owners = new int[ownerArray.size()];
+                for (int j = 0; j < owners.length; ++j) {
+                    owners[j] = (int) ownerArray.get(j).isNumber().getValue();
                 }
-                getStateWidget(card).setState(status, owner);
+                getStateWidget(card).setState(status, owners);
             }
-                /*NodeList newInfoNodes = response.getElementsByTagName("newInfo");
-                for (int i = 0; i < newInfoNodes.getLength(); ++i) {
-                    Node curNode = newInfoNodes.item(i);
-                    //String card = getChildTextFromNode(curNode.getElementsByTagName("card").item(0));
-                    String card = getChildTextFromNode((Node) curNode.getNodes("card").get(0));
-                }*/
         }
       }
       public void onError(Throwable ex) {
@@ -175,7 +172,7 @@ public class ClueSolver implements EntryPoint {
     whoOwnsCardPanel.add(tempPanel1);
     Button whoOwnsSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
-            CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=whoOwns&owner=" + ownerOwned.getValue(ownerOwned.getSelectedIndex()) + "&card=" + whichCardOwned.getValue(whichCardOwned.getSelectedIndex()), newInfoHandler);
+            CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=whoOwns&owner=" + listBoxValue(ownerOwned) + "&card=" + listBoxValue(whichCardOwned), newInfoHandler);
         }
     });
     whoOwnsCardPanel.add(whoOwnsSubmitButton);
@@ -183,28 +180,40 @@ public class ClueSolver implements EntryPoint {
     VerticalPanel suggestionMadePanel = new VerticalPanel();
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Made by: "));
-    tempPanel1.add(makeNewPlayerListBox(false, false));
+    final ListBox suggestingPlayer = makeNewPlayerListBox(false, false);
+    tempPanel1.add(suggestingPlayer);
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Suspect: "));
-    tempPanel1.add(makeNewCardListBox(0, false));
+    final ListBox card1 = makeNewCardListBox(0, false);
+    tempPanel1.add(card1);
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Weapon: "));
-    tempPanel1.add(makeNewCardListBox(1, false));
+    final ListBox card2 = makeNewCardListBox(1, false);
+    tempPanel1.add(card2);
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Room: "));
-    tempPanel1.add(makeNewCardListBox(2, false));
+    final ListBox card3 = makeNewCardListBox(2, false);
+    tempPanel1.add(card3);
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Refuted by: "));
-    tempPanel1.add(makeNewPlayerListBox(true, false));
+    final ListBox refutingPlayer = makeNewPlayerListBox(true, false);
+    tempPanel1.add(refutingPlayer);
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Refuting card: "));
-    tempPanel1.add(makeNewCardListBox(-1, true));
+    final ListBox refutingCard = makeNewCardListBox(-1, true);
+    tempPanel1.add(refutingCard);
     suggestionMadePanel.add(tempPanel1);
+    Button suggestionSubmitButton = new Button("Add info", new ClickListener() {
+        public void onClick(Widget sender) {
+            CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=suggestion&suggestingPlayer=" + listBoxValue(suggestingPlayer) + "&card1=" + listBoxValue(card1) + "&card2=" + listBoxValue(card2) + "&card3=" + listBoxValue(card3) + "&refutingPlayer=" + listBoxValue(refutingPlayer) + "&refutingCard=" + listBoxValue(refutingCard), newInfoHandler);
+        }
+    });
+    suggestionMadePanel.add(suggestionSubmitButton);
     enterInfoTabs.add(suggestionMadePanel, "Suggestion made");
 
     enterInfoTabs.selectTab(0);
@@ -245,6 +254,8 @@ public class ClueSolver implements EntryPoint {
   }
 
   public void setNumberOfPlayers(int numP) {
+    // TODO - check here if we've done anything.  If not, fine.
+    // If so, ask if they really want to start a new game.
     int curNumP = playerNames.length;
     String[] newPlayerNames = new String[numP];
     if (curNumP > numP) {
@@ -271,6 +282,10 @@ public class ClueSolver implements EntryPoint {
   public ClueStateWidget getStateWidget(String id) {
       return (ClueStateWidget) internalNameToClueStateWidgetMap.get(id);
       //return ((ClueStateWidget)RootPanel.get(id).getWidget(0));
+  }
+
+  public static String listBoxValue(ListBox lb) {
+      return lb.getValue(lb.getSelectedIndex());
   }
 
   public ListBox makeNewCardListBox(int index, boolean includeNoneUnknown) {
@@ -317,6 +332,13 @@ public class ClueSolver implements EntryPoint {
             ++curIndex;
         }
         listBox.setItemText(curIndex, newName);
+      }
+      // Update the tooltips on the images in the ClueStateWidgets
+      Set stateWidgetKeys = internalNameToClueStateWidgetMap.entrySet();
+      for (Iterator it = stateWidgetKeys.iterator(); it.hasNext();) {
+          Map.Entry curEntry = (Map.Entry) it.next(); 
+          ClueStateWidget curWidget = (ClueStateWidget) curEntry.getValue();
+          curWidget.setImage();
       }
   }
 

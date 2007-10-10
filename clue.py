@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import elementtree.ElementTree as ET
-import cgi, sys
+import cgi, sys, json
 import clueengine
 
 def error(str):
@@ -14,6 +14,24 @@ def success(str):
     print '{"errorStatus": 0, %s}' % str
     sys.exit(0)
 
+def getInfoFromChangedCards(engine, changedCards):
+    info = []
+    for card in changedCards:
+        possibleOwners = list(engine.whoHasCard(card))
+        if len(possibleOwners) == 1:
+            owner = possibleOwners[0]
+            if (owner == engine.numPlayers):
+                status = 2
+            else:
+                status = 1
+            info.append({"card": card, "status": status, "owner":possibleOwners})
+        else:
+            if engine.numPlayers in possibleOwners:
+                status = 0
+            else:
+                status = 1
+            info.append({"card": card, "status": status, "owner":possibleOwners}) 
+    return info
 form = cgi.FieldStorage()
 action = None
 if (form.has_key('action')):
@@ -42,10 +60,22 @@ if (action == 'whoOwns'):
         error("Internal error: action=whoOwns, missing owner or card!")
     owner = int(form.getfirst('owner'))
     card = form.getfirst('card')
-    engine.infoOnCard(owner, card, True)
-    # status = 1 means owned by player
-    status = 1
-    if (owner == engine.numPlayers):
-        # status = 1 means owned by case file
-        status = 2
-    success('"newInfo": [{"card": "%s", "status": %d, "owner": %d}], "session": "%s"' % (card, status, owner, engine.writeToString()))
+    changedCards = engine.infoOnCard(owner, card, True)
+    success('"newInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), engine.writeToString()))
+if (action == 'suggestion'):
+    # See what the suggestion is
+    if (not form.has_key('suggestingPlayer') or not form.has_key('card1') or not form.has_key('card2') or not form.has_key('card3') or not form.has_key('refutingPlayer') or not form.has_key('refutingCard')):
+        error("Internal error: action=whoOwns, missing suggestingPlayer, card1, card2, card3, refutingPlayer, or refutingCard!")
+    suggestingPlayer = int(form.getfirst('suggestingPlayer'))
+    card1 = form.getfirst('card1')
+    card2 = form.getfirst('card2')
+    card3 = form.getfirst('card3')
+    refutingPlayer = int(form.getfirst('refutingPlayer'))
+    refutingCard = form.getfirst('refutingCard')
+    if (refutingPlayer == -1):
+        refutingPlayer = None
+    if (refutingCard == "None"):
+        refutingCard = None
+    changedCards = engine.suggest(suggestingPlayer, card1, card2, card3, refutingPlayer, refutingCard)
+    success('"newInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), engine.writeToString()))
+i
