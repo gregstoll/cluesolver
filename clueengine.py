@@ -92,6 +92,7 @@ class ClueEngine:
 
     def __str__(self):
         return repr(self)
+
     @classmethod
     def cardFromChar(cls, char):
         idx = ord(char) - ord('A')

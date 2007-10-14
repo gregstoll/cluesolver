@@ -6,6 +6,8 @@ import com.google.gwt.http.client.URL;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.ClickListener;
+import com.google.gwt.user.client.ui.DialogBox;
+import com.google.gwt.user.client.ui.DockPanel;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.Grid;
 import com.google.gwt.user.client.ui.HorizontalPanel;
@@ -43,10 +45,12 @@ public class ClueSolver implements EntryPoint {
                                     {"Knife", "Candlestick", "Revolver", "Lead Pipe", "Rope", "Wrench"},
                                     {"Hall", "Conservatory", "Dining Room", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "Billiard Room"}};
 
-  public String[] playerNames = {"Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6"};
+  public ArrayList playerNames = new ArrayList(); //{"Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6"};
   public VerticalPanel namesPanel = null;
   public HashMap internalNameToClueStateWidgetMap = new HashMap();
+  public boolean infoAdded = false;
   private ArrayList playerListBoxes = new ArrayList();
+  private ArrayList numPlayersButtons = new ArrayList();
   public static final String scriptName = "clue.cgi";
   public String curSessionString = null;
   /*private static class TestPopup extends PopupPanel {
@@ -59,9 +63,40 @@ public class ClueSolver implements EntryPoint {
         setStyleName("ks-popups-Popup");
     }
   }*/
+  private static class ConfirmNewGameDialog extends DialogBox implements ClickListener {
+      private ClueSolver solver;
+      public ConfirmNewGameDialog(ClueSolver _solver) {
+          solver = _solver;
+          Button okButton = new Button("OK", this);
+          Button cancelButton = new Button("Cancel", this);
+          setText("Confirm new game");
+          DockPanel dock = new DockPanel();
+          HorizontalPanel buttonPanel = new HorizontalPanel();
+          buttonPanel.add(okButton);
+          buttonPanel.add(cancelButton);
+          dock.add(buttonPanel, DockPanel.SOUTH);
+          dock.add(new HTML("Are you sure you want to start a new game and wipe out all progress?<br><br>"), DockPanel.NORTH);
+          setWidget(dock);
+      }
+      public void onClick(Widget sender) {
+          String text = ((Button) sender).getText();
+          if (text.equals("OK")) {
+              solver.startNewGame();
+          }
+          hide();
+      }
+  }
 
   CgiResponseHandler newInfoHandler = new CgiResponseHandler() {
       public void onSuccess(String body) {
+        if (infoAdded == false) {
+            // We have real info now, so don't change the number of players!
+            infoAdded = true;
+            for (int i = 0; i < numPlayersButtons.size(); ++i) {
+                RadioButton button = ((RadioButton) numPlayersButtons.get(i));
+                button.setEnabled(false);
+            }
+        }
         JSONObject response = JSONParser.parse(body).isObject();
         double errorStatus = response.get("errorStatus").isNumber().getValue();
         if (errorStatus != 0.0) {
@@ -93,6 +128,12 @@ public class ClueSolver implements EntryPoint {
    */
   public void onModuleLoad() {
     ClueStateWidget.solver = this;
+    playerNames.add("Player 1");
+    playerNames.add("Player 2");
+    playerNames.add("Player 3");
+    playerNames.add("Player 4");
+    playerNames.add("Player 5");
+    playerNames.add("Player 6");
 
     VerticalPanel playerInfoPanel = new VerticalPanel();
     playerInfoPanel.setHorizontalAlignment(VerticalPanel.ALIGN_LEFT);
@@ -120,16 +161,25 @@ public class ClueSolver implements EntryPoint {
             cur.setChecked(true);
         }
         radioPanel.add(cur);
+        numPlayersButtons.add(cur);
     }
     playerInfoPanel.add(radioPanel);
     namesPanel = new VerticalPanel();
     namesPanel.setHorizontalAlignment(VerticalPanel.ALIGN_LEFT);
     namesPanel.setVerticalAlignment(HorizontalPanel.ALIGN_TOP);
-    for (int i = 0; i < playerNames.length; ++i) {
-        NameSuggestPanel nsp = new NameSuggestPanel(playerNames[i], i, this);
+    for (int i = 0; i < playerNames.size(); ++i) {
+        NameSuggestPanel nsp = new NameSuggestPanel((String) playerNames.get(i), i, this);
         namesPanel.add(nsp);
     }
     playerInfoPanel.add(namesPanel);
+    final ClueSolver cluesolver = this;
+    Button newGameButton = new Button("New game", new ClickListener() {
+        public void onClick(Widget sender) {
+            ConfirmNewGameDialog dialog = new ConfirmNewGameDialog(cluesolver);
+            dialog.center();
+        }
+    });
+    playerInfoPanel.add(newGameButton);
 
     HorizontalPanel gameInfoPanel = new HorizontalPanel();
     gameInfoPanel.setHorizontalAlignment(VerticalPanel.ALIGN_LEFT);
@@ -226,10 +276,53 @@ public class ClueSolver implements EntryPoint {
     tabs.selectTab(0);
     RootPanel.get().add(tabs);
 
-    /*getStateWidget("ProfessorPlum").setState(ClueStateWidget.STATE_OWNED_BY_CASEFILE, -1);
-    getStateWidget("ColonelMustard").setState(ClueStateWidget.STATE_OWNED_BY_PLAYER, 1);*/
     // Get the state of the game.
-    CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=new&players=6", new CgiResponseHandler() {
+    setNumberOfPlayers(6);
+     
+  }
+
+  public void setNumberOfPlayers(int numP) {
+    int curNumP = playerNames.size();
+    int deltaNumP = numP - curNumP;
+    if (curNumP > numP) {
+        while (curNumP > numP) {
+            namesPanel.remove(namesPanel.getWidgetCount() - 1);
+            playerNames.remove(playerNames.size() - 1);
+            --curNumP;
+        }
+    } else if (curNumP < numP) {
+        while (curNumP < numP) {
+            playerNames.add("Player " + new Integer(curNumP + 1).toString());
+            namesPanel.add(new NameSuggestPanel((String) playerNames.get(curNumP), curNumP, this));
+            ++curNumP;
+        }
+    }
+    // Update the list boxes.
+    for (int i = 0; i < playerListBoxes.size(); ++i) {
+        ListBox listBox = (ListBox) playerListBoxes.get(i);
+        int endCorrection = 0;
+        int startIndex = 0;
+        // See if we start with an extra item.
+        if (listBox.getValue(0).equals("-1")) {
+            startIndex = 1;
+        }
+        // See if we end with an extra item.
+        if (listBox.getValue(listBox.getItemCount() - 1).equals(new Integer(numP - deltaNumP).toString())) {
+            endCorrection = 1;
+        }
+        int currentNumInListBox = listBox.getItemCount() - startIndex;
+
+        if (deltaNumP > 0) {
+            for (int j = 0; j < deltaNumP; ++j) {
+                listBox.insertItem((String) playerNames.get(j+(currentNumInListBox-1)), new Integer(j+currentNumInListBox).toString(), (listBox.getItemCount() - 1) - endCorrection);
+            }
+        } else if (deltaNumP < 0) {
+            for (int j = 0; j > deltaNumP; --j) {
+                listBox.removeItem(listBox.getItemCount() - 1 - endCorrection);
+            }
+        }
+    }
+    CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=new&players=" + playerNames.size(), new CgiResponseHandler() {
         public void onSuccess(String body) {
             JSONObject response = JSONParser.parse(body).isObject();
             double errorStatus = response.get("errorStatus").isNumber().getValue();
@@ -243,45 +336,30 @@ public class ClueSolver implements EntryPoint {
             Window.alert("Internal error - unable to contact backend for new session - " + ex.getMessage());
         }
     });
-     
-    // Assume that the host HTML has elements defined whose
-    // IDs are "slot1", "slot2".  In a real app, you probably would not want
-    // to hard-code IDs.  Instead, you could, for example, search for all 
-    // elements with a particular CSS class and replace them with widgets.
-    //
-    //RootPanel.get("table").add(g);
-    
+ 
   }
 
-  public void setNumberOfPlayers(int numP) {
-    // TODO - check here if we've done anything.  If not, fine.
-    // If so, ask if they really want to start a new game.
-    int curNumP = playerNames.length;
-    String[] newPlayerNames = new String[numP];
-    if (curNumP > numP) {
-        for (int i = 0; i < numP; ++i) {
-            newPlayerNames[i] = playerNames[i];
-        }
-        while (curNumP > numP) {
-            namesPanel.remove(namesPanel.getWidgetCount() - 1);
-            --curNumP;
-        }
-    } else if (curNumP < numP) {
-        for (int i = 0; i < curNumP; ++i) {
-            newPlayerNames[i] = playerNames[i];
-        }
-        while (curNumP < numP) {
-            newPlayerNames[curNumP] = "Player " + new Integer(curNumP + 1).toString();
-            namesPanel.add(new NameSuggestPanel(newPlayerNames[curNumP], curNumP, this));
-            ++curNumP;
+  public void startNewGame() {
+    if (infoAdded == true) {
+        infoAdded = false;
+        for (int i = 0; i < numPlayersButtons.size(); ++i) {
+            RadioButton button = ((RadioButton) numPlayersButtons.get(i));
+            button.setEnabled(true);
         }
     }
-    playerNames = newPlayerNames;
+    setNumberOfPlayers(playerNames.size());
+    // Reset the widgets
+    Set stateWidgetKeys = internalNameToClueStateWidgetMap.entrySet();
+    for (Iterator it = stateWidgetKeys.iterator(); it.hasNext();) {
+        Map.Entry curEntry = (Map.Entry) it.next(); 
+        ClueStateWidget curWidget = (ClueStateWidget) curEntry.getValue();
+        curWidget.setState(ClueStateWidget.STATE_UNKNOWN, null);
+    }
+ 
   }
 
   public ClueStateWidget getStateWidget(String id) {
       return (ClueStateWidget) internalNameToClueStateWidgetMap.get(id);
-      //return ((ClueStateWidget)RootPanel.get(id).getWidget(0));
   }
 
   public static String listBoxValue(ListBox lb) {
@@ -312,18 +390,18 @@ public class ClueSolver implements EntryPoint {
       if (includeNone) {
           toReturn.addItem("None", "-1");
       }
-      for (int i = 0; i < playerNames.length; ++i) {
-          toReturn.addItem(playerNames[i], new Integer(i).toString());
+      for (int i = 0; i < playerNames.size(); ++i) {
+          toReturn.addItem((String) playerNames.get(i), new Integer(i).toString());
       }
       if (includeSolution) {
-          toReturn.addItem("Solution (case file)", new Integer(playerNames.length).toString());
+          toReturn.addItem("Solution (case file)", new Integer(playerNames.size()).toString());
       }
       playerListBoxes.add(toReturn);
       return toReturn;
   }
 
   public void changePlayerName(int index, String newName) {
-      playerNames[index] = newName;
+      playerNames.set(index, newName);
       for (int i = 0; i < playerListBoxes.size(); ++i) {
         ListBox listBox = ((ListBox) playerListBoxes.get(i));
         // See if we start with an extra item.

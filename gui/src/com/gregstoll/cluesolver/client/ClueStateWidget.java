@@ -59,6 +59,8 @@ public class ClueStateWidget extends HorizontalPanel {
             for (int i = 0; i < ownerIndices.length; ++i) {
                 ownerIndices[i] = owners[i];
             }
+        } else {
+            ownerIndices = null;
         }
         setImage();
     }
@@ -67,15 +69,14 @@ public class ClueStateWidget extends HorizontalPanel {
         if (ownerIndices.length == 0) {
             return "???";
         }
-        // Yeah, we should build this up in a 
         StringBuffer buffer = new StringBuffer();
         for (int i = 0; i < ownerIndices.length; ++i) {
             String ownerName;
             int curIndex = ownerIndices[i];
-            if (curIndex == solver.playerNames.length) {
+            if (curIndex == solver.playerNames.size()) {
                 ownerName = "(solution)";
             } else {
-                ownerName = solver.playerNames[curIndex];
+                ownerName = (String) solver.playerNames.get(curIndex);
             }
             buffer.append(ownerName);
             if (i < ownerIndices.length - 1) {
@@ -89,7 +90,7 @@ public class ClueStateWidget extends HorizontalPanel {
         switch (curState) {
             case STATE_UNKNOWN:
                 images.unknown().applyTo(curImage);
-                if (ownerIndices.length > 0) {
+                if (ownerIndices != null && ownerIndices.length > 0) {
                     curImage.setTitle("Owned by " + getOwnedByString());
                 } else {
                     curImage.setTitle("Unknown");
@@ -101,7 +102,6 @@ public class ClueStateWidget extends HorizontalPanel {
                 break;
             default:
                 // STATE_OWNED_BY_CASEFILE
-                // TODO - assert?
             case STATE_OWNED_BY_CASEFILE:
                 images.ownedByCasefile().applyTo(curImage);
                 curImage.setTitle("Solution!");
