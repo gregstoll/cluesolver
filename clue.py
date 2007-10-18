@@ -50,7 +50,13 @@ if (action != 'new'):
 else:
     if (not form.has_key('players')):
         error("Internal error - action new without players!")
-    engine = clueengine.ClueEngine(int(form.getfirst('players')))
+    numPlayers = int(form.getfirst('players'))
+    engine = clueengine.ClueEngine(numPlayers)
+    for i in range(numPlayers):
+        if (not form.has_key('numCards%d' % i)):
+            error("Internal error - action new missing key numCards%d!" % i)
+        numP = int(form.getfirst('numCards%d' % i))
+        engine.players[i].numCards = numP
 if (action == 'new'):
     # This is all we have to do.
     success('"session": "%s"' % engine.writeToString())

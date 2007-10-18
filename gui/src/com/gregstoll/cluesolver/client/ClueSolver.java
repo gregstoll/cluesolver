@@ -96,6 +96,10 @@ public class ClueSolver implements EntryPoint {
                 RadioButton button = ((RadioButton) numPlayersButtons.get(i));
                 button.setEnabled(false);
             }
+            // disable changing number of cards
+            for (int i = 0; i < playerNames.size(); ++i) {
+                ((NameSuggestPanel) namesPanel.getWidget(i)).setNumCardsEnabled(false);
+            }
         }
         JSONObject response = JSONParser.parse(body).isObject();
         double errorStatus = response.get("errorStatus").isNumber().getValue();
@@ -140,7 +144,7 @@ public class ClueSolver implements EntryPoint {
     playerInfoPanel.setVerticalAlignment(HorizontalPanel.ALIGN_TOP);
     playerInfoPanel.add(new HTML("Number of players:"));
     FlowPanel radioPanel = new FlowPanel();
-    for (int i = 2; i <= 6; ++i) {
+    for (int i = 3; i <= 6; ++i) {
         RadioButton cur = new RadioButton("numPlayers", new Integer(i).toString());
         final int iFinal = i;
         /*cur.addClickListener(new ClickListener() {
@@ -297,6 +301,17 @@ public class ClueSolver implements EntryPoint {
             ++curNumP;
         }
     }
+    // Update the number of cards
+    int[] numCards = new int[numP];
+    // There are 18 cards among the players.
+    int baseNumCards = 18 / numP;
+    int leftovers = 18 % numP;
+    for (int i = 0; i < numP; ++i) {
+        numCards[i] = (i < leftovers) ? (baseNumCards + 1) : baseNumCards;
+    }
+    for (int i = 0; i < numP; ++i) {
+        ((NameSuggestPanel) namesPanel.getWidget(i)).setDefaultNumCards(numCards[i]);
+    }
     // Update the list boxes.
     for (int i = 0; i < playerListBoxes.size(); ++i) {
         ListBox listBox = (ListBox) playerListBoxes.get(i);
@@ -322,7 +337,17 @@ public class ClueSolver implements EntryPoint {
             }
         }
     }
-    CgiHelper.doRequest(RequestBuilder.POST, scriptName, "action=new&players=" + playerNames.size(), new CgiResponseHandler() {
+    doNewGameRequest(); 
+  }
+
+  public void doNewGameRequest() {
+    StringBuffer requestStringBuffer = new StringBuffer();
+    requestStringBuffer.append("action=new&players=" + playerNames.size());
+    for (int i = 0; i < playerNames.size(); ++i) {
+        int numCards = ((NameSuggestPanel) namesPanel.getWidget(i)).getNumCards();
+        requestStringBuffer.append("&numCards" + new Integer(i).toString() + "=" + numCards);
+    }
+    CgiHelper.doRequest(RequestBuilder.POST, scriptName, requestStringBuffer.toString(), new CgiResponseHandler() {
         public void onSuccess(String body) {
             JSONObject response = JSONParser.parse(body).isObject();
             double errorStatus = response.get("errorStatus").isNumber().getValue();
@@ -346,6 +371,11 @@ public class ClueSolver implements EntryPoint {
             RadioButton button = ((RadioButton) numPlayersButtons.get(i));
             button.setEnabled(true);
         }
+        // enable changing number of cards
+        for (int i = 0; i < playerNames.size(); ++i) {
+            ((NameSuggestPanel) namesPanel.getWidget(i)).setNumCardsEnabled(true);
+        }
+ 
     }
     setNumberOfPlayers(playerNames.size());
     // Reset the widgets

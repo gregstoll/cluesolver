@@ -1,21 +1,22 @@
 #!/usr/bin/python
 
-import unittest, sets
+import unittest, sets, copy
 
 class PlayerData:
-    def __init__(self, clueengine, isSolutionPlayer=False):
+    def __init__(self, clueengine, numCards, isSolutionPlayer=False):
         # A set of cards that the player is known to have
         self.hasCards = sets.Set()
         # A set of cards that the player is known not to have
         self.notHasCards = sets.Set()
-        # A list of clauses.  Each clauses is a list of cards, one of which
+        # A list of clauses.  Each clause is a set of cards, one of which
         # the player is known to have.
         self.possibleCards = []
         self.clueEngine = clueengine
         self.isSolutionPlayer = isSolutionPlayer
+        self.numCards = numCards
 
     def __repr__(self):
-        return "PD(%s,%s,%s)" % (self.hasCards, self.notHasCards, self.possibleCards)
+        return "PD(%d,%s,%s,%s)" % (self.numCards, self.hasCards, self.notHasCards, self.possibleCards)
 
     def infoOnCard(self, card, hasCard, updateClueEngine=True):
         changedCards = set()
@@ -59,23 +60,119 @@ class PlayerData:
                 # We have learned player has this card!
                 changedCards.update(self.infoOnCard(newClause[0], True))
             else:
-                self.possibleCards.append(newClause)
+                self.possibleCards.append(set(newClause))
+            changedCards.update(self.examineClauses(None))
         return changedCards
 
+    def eliminateExtraneousClauses(self):
+        for i in range(len(self.possibleCards)):
+            for j in range(i+1, len(self.possibleCards)):
+                clause1 = self.possibleCards[i]
+                clause2 = self.possibleCards[j]
+                if (clause1.issubset(clause2)):
+                    # clause 2 is extraneous
+                    self.possibleCards = self.possibleCards[:j] + self.possibleCards[j+1:]
+                    # The easiest way to check without messing up the loop is
+                    # to start over, although it's kinda slow.  But I don't
+                    # expect there to be tons of extraneous clauses.
+                    return self.eliminateExtraneousClauses()
+                elif (clause1.issuperset(clause2)):
+                    # clause 1 is extraneous
+                    self.possibleCards = self.possibleCards[:i] + self.possibleCards[i+1:]
+                    # See above
+                    return self.eliminateExtraneousClauses()
+
+    def transposeClauses(self, possibleCards):
+        cardClauses = {}
+        for i in range(len(possibleCards)):
+            clause = possibleCards[i]
+            for card in clause:
+                if card in cardClauses:
+                    cardClauses[card].add(i)
+                else:
+                    cardClauses[card] = set([i])
+        return cardClauses
+
+    def removeCardFromClauses(self, clauses, card):
+        newClauses = []
+        for clause in clauses:
+            # Copy so we don't destroy the original one
+            newClause = set(list(clause))
+            if (card in newClause):
+                newClause.remove(card)
+            newClauses.append(newClause)
+        return newClauses
+
+    def removeClauses(self, clauses, indicesToRemove):
+        newClauses = []
+        for i in range(len(clauses)):
+            if (i not in indicesToRemove):
+                newClauses.append(clauses[i])
+        return newClauses
+   
+    def canSatisfy(self, clauses, numUnaccountedFor):
+        if len(clauses) == 0:
+            return True
+        if numUnaccountedFor == 0:
+            return False
+        # See if there's any way we can satisfy these.
+        # Try one card at a time.
+        cardClauses = self.transposeClauses(clauses)
+        for testCard in cardClauses:
+            # First, remove all clauses containing this card.
+            newClauses = self.removeClauses(clauses, cardClauses[testCard])
+            # See if it's possible to satisfy the rest of the clauses with one fewer card.
+            isPossible = self.canSatisfy(newClauses, numUnaccountedFor - 1)
+            if (isPossible):
+                return True
+        return False
+
     def examineClauses(self, card):
+        # Eliminate clauses.
+        self.eliminateExtraneousClauses()
         changedCards = set()
-        for clause in self.possibleCards:
-            if (card in clause):
-                if (card in self.hasCards):
-                    # We have this card, so this clause is done.
-                    self.possibleCards.remove(clause)
-                elif (card in self.notHasCards):
-                    clause.remove(card)
-                    if (len(clause) == 1):
-                        # We have this card!
-                        self.hasCards.add(clause[0])
+        if (card != None):
+            possibleCardsCopy = copy.copy(self.possibleCards)
+            for clause in possibleCardsCopy:
+                if (card in clause):
+                    if (card in self.hasCards):
+                        # We have this card, so this clause is done.
                         self.possibleCards.remove(clause)
-                        changedCards.add(clause[0])
+                    elif (card in self.notHasCards):
+                        # Remove this card from the clause
+                        clause.remove(card)
+                        if (len(clause) == 1):
+                            # We have this card!
+                            self.hasCards.add(list(clause)[0])
+                            self.possibleCards.remove(clause)
+                            changedCards.add(list(clause)[0])
+        if (self.numCards != -1):
+            if (self.numCards == len(self.hasCards)):
+                # All cards are accounted for.
+                for cardType in self.clueEngine.cards:
+                    for card in self.clueEngine.cards[cardType]:
+                        if (card not in self.hasCards and card not in self.notHasCards):
+                            changedCards.update(self.infoOnCard(card, False))
+            elif (len(self.hasCards) + len(self.possibleCards) > self.numCards):
+                # We may be able to figure out something.
+                numUnaccountedFor = self.numCards - len(self.hasCards)
+                cardClauses = self.transposeClauses(self.possibleCards)
+                for testCard in cardClauses:
+                    # See if we could have this card, by contradiction.
+                    # Assume we don't have this card.  Remove it from
+                    # all clauses.
+                    newClauses = self.removeCardFromClauses(self.possibleCards, testCard)
+                    # If there are any empty clauses we have a contradiction already.
+                    if (set() in newClauses):
+                        isPossible = False
+                    else:
+                        # See if it's possible to satisfy the rest of the clauses with one fewer card.
+                        isPossible = self.canSatisfy(newClauses, numUnaccountedFor)
+                    if (not isPossible):
+                        # We found a contradiction if we don't have this card,
+                        # so we must have this card.
+                        changedCards.update(self.infoOnCard(testCard, True))
+                        return changedCards
         return changedCards
 
 class ClueEngine:
@@ -85,13 +182,26 @@ class ClueEngine:
     cards['room'] = ['Hall', 'Conservatory', 'DiningRoom', 'Kitchen', 'Study', 'Library', 'Ballroom', 'Lounge', 'BilliardRoom']
     def __init__(self, players=6):
         self.numPlayers = players
-        self.players = [PlayerData(self, (i == self.numPlayers)) for i in range(self.numPlayers+1)]
+        self.players = [PlayerData(self, ClueEngine.getNumberOfCards(i, self.numPlayers), (i == self.numPlayers)) for i in range(self.numPlayers+1)]
 
     def __repr__(self):
         return "Engine:\n" + "\n".join([repr(x) for x in self.players])
 
     def __str__(self):
         return repr(self)
+
+    @classmethod
+    def getNumberOfCards(cls, playerIndex, numPlayers):
+        if (playerIndex == numPlayers):
+            # The case file always has exactly 3 cards, for what it's worth.
+            return 3
+        # There are 18 cards among the players.
+        numCards = 18 / numPlayers # Integer division
+        leftovers = 18 % numPlayers
+        # Assume the earlier players get the extra cards
+        if (playerIndex < leftovers):
+            numCards += 1
+        return numCards
 
     @classmethod
     def cardFromChar(cls, char):
@@ -142,6 +252,11 @@ class ClueEngine:
 
     @classmethod
     def loadPlayerFromString(cls, str, idx, ce):
+        numCards = int(str[0])
+        if (numCards == 0):
+            numCards = -1
+        ce.players[idx].numCards = numCards
+        str = str[1:]
         # Load the list of cards this player has
         while (str[0] != '-'):
             ce.infoOnCard(idx, cls.cardFromChar(str[0]), True)
@@ -164,7 +279,11 @@ class ClueEngine:
         return str
 
     def writePlayerToString(self, idx):
-        str = ''
+        numCardsToWrite = self.players[idx].numCards
+        # Always write one digit for simplicity
+        if (numCardsToWrite == -1):
+            numCardsToWrite = 0
+        str = '%d' % numCardsToWrite
         for card in self.players[idx].hasCards:
             str += ClueEngine.charFromCard(card)
         str += '-'
@@ -336,7 +455,7 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ce.whoHasCard('ProfessorPlum'), [0,3,4,5,6])
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife', 'Hall'))
         self.assertEqual(len(ce.players[3].possibleCards), 1)
-        self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife', 'Hall'])
+        self.assertEqual(ce.players[3].possibleCards[0], set(['ProfessorPlum', 'Knife', 'Hall']))
         cc = ce.infoOnCard(3, 'Hall', True)
         self.assertEqual(cc, self.makeSet('Hall'))
         self.assertEqual(ce.whoHasCard('Hall'), [3])
@@ -349,12 +468,12 @@ class TestCaseClueEngine(unittest.TestCase):
         cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 3, None)
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife', 'Hall'))
         self.assertEqual(len(ce.players[3].possibleCards), 1)
-        self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife', 'Hall'])
+        self.assertEqual(ce.players[3].possibleCards[0], set(['ProfessorPlum', 'Knife', 'Hall']))
         cc = ce.infoOnCard(3, 'Hall', False)
         self.assertEqual(cc, self.makeSet('Hall'))
         self.assertEqual(ce.playerHasCard(3, 'Hall'), False)
         self.assertEqual(len(ce.players[3].possibleCards), 1)
-        self.assertEqual(ce.players[3].possibleCards[0], ['ProfessorPlum', 'Knife'])
+        self.assertEqual(ce.players[3].possibleCards[0], set(['ProfessorPlum', 'Knife']))
         cc = ce.infoOnCard(3, 'ProfessorPlum', False)
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife'))
         self.assertEqual(ce.playerHasCard(3, 'ProfessorPlum'), False)
@@ -394,7 +513,50 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(cc, self.makeSet('MrGreen'))
         self.assertEqual(ce.playerHasCard(5, 'MrGreen'), True)
 
+    def testNumberCardLimit(self):
+        ce = ClueEngine()
+        ce.infoOnCard(0, 'MrGreen', True)
+        ce.infoOnCard(0, 'Knife', True)
+        ce.infoOnCard(0, 'Wrench', True)
+        self.assertEqual(len(ce.players[0].hasCards), 3)
+        self.assertEqual(len(ce.players[0].notHasCards), 18)
+        self.assertEqual(len(ce.players[0].possibleCards), 0)
 
+    def testNumberCardDeduction(self):
+        ce = ClueEngine()
+        cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 2, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Knife', 'Hall']))
+        cc = ce.suggest(0, 'ProfessorPlum', 'Revolver', 'Lounge', 2, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Revolver', 'Lounge']))
+        cc = ce.suggest(0, 'ProfessorPlum', 'Candlestick', 'BilliardRoom', 2, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Candlestick', 'BilliardRoom']))
+        cc = ce.suggest(0, 'ProfessorPlum', 'Rope', 'Kitchen', 2, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Rope', 'Kitchen']))
+        self.assertEqual(ce.whoHasCard('ProfessorPlum'), [2])
+        ce = ClueEngine()
+        ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 2, None)
+        ce.suggest(0, 'ProfessorPlum', 'Knife', 'Lounge', 2, None)
+        ce.suggest(0, 'ProfessorPlum', 'Knife', 'BilliardRoom', 2, None)
+        self.assertEqual(len(ce.players[2].possibleCards), 3)
+        ce.suggest(0, 'ProfessorPlum', 'Knife', 'Kitchen', 2, None)
+        cc = ce.infoOnCard(2, 'ProfessorPlum', False)
+        self.assertEqual(cc, set(['Knife', 'ProfessorPlum']))
+        self.assertEqual(ce.whoHasCard('Knife'), [2])
+        self.assertEqual(len(ce.players[2].possibleCards), 0)
+
+    def testEliminateExtraneousClauses(self):
+        ce = ClueEngine()
+        cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 2, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Knife', 'Hall']))
+        cc = ce.infoOnCard(2, 'Hall', False)
+        self.assertEqual(cc, set(['Hall']))
+        self.assertEqual(len(ce.players[2].possibleCards), 1)
+        self.assertEqual(ce.players[2].possibleCards[0], set(['ProfessorPlum', 'Knife']))
+        cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Lounge', 2, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Knife', 'Lounge']))
+        self.assertEqual(len(ce.players[2].possibleCards), 1)
+        self.assertEqual(ce.players[2].possibleCards[0], set(['ProfessorPlum', 'Knife']))
+ 
     def testCardFromChar(self):
         self.assertEqual(ClueEngine.cardFromChar('A'), 'ProfessorPlum')
         self.assertEqual(ClueEngine.cardFromChar('B'), 'ColonelMustard')
@@ -421,9 +583,9 @@ class TestCaseClueEngine(unittest.TestCase):
 
 
     def testLoadFromString(self):
-        (ce, str) = ClueEngine.loadFromString('2AH-BCD-KL-MN.-AH.-.')
+        (ce, str) = ClueEngine.loadFromString('29AH-BCD-KL-MN.9-AH.3-.')
         self.assertEqual(str, '')
-        (ce, str) = ClueEngine.loadFromString('2A-.-.-.')
+        (ce, str) = ClueEngine.loadFromString('29A-.9-.3-.')
         self.assertEqual(str, '')
         self.assertEqual(len(ce.players[0].hasCards), 1)
         self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
@@ -434,25 +596,25 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(len(ce.players[2].hasCards), 0)
         self.assertEqual(len(ce.players[2].notHasCards), 1)
         self.assertEqual(ce.playerHasCard(2, 'ProfessorPlum'), False)
-        (ce, str) = ClueEngine.loadFromString('2A-B.L-C.U-.')
+        (ce, str) = ClueEngine.loadFromString('29A-B.9L-C.3U-.')
         self.assertEqual(str, '')
         self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
         self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), False)
         self.assert_(ce.playerHasCard(1, 'Wrench'))
         self.assertEqual(ce.playerHasCard(1, 'MrGreen'), False)
         self.assert_(ce.playerHasCard(2, 'BilliardRoom'))
-        (ce, str) = ClueEngine.loadFromString('2-.A-B-CDE-FGH.U-.')
+        (ce, str) = ClueEngine.loadFromString('29-.9A-B-CDE-FGH.3U-.')
         self.assertEqual(str, '')
         self.assert_(ce.playerHasCard(1, 'ProfessorPlum'))
         self.assertEqual(ce.playerHasCard(1, 'ColonelMustard'), False)
         self.assertEqual(len(ce.players[1].possibleCards), 2)
-        self.assertEqual(ce.players[1].possibleCards[0], [ClueEngine.cardFromChar('C'), ClueEngine.cardFromChar('D'), ClueEngine.cardFromChar('E')])
-        self.assertEqual(ce.players[1].possibleCards[1], [ClueEngine.cardFromChar('F'), ClueEngine.cardFromChar('G'), ClueEngine.cardFromChar('H')])
+        self.assertEqual(ce.players[1].possibleCards[0], set([ClueEngine.cardFromChar('C'), ClueEngine.cardFromChar('D'), ClueEngine.cardFromChar('E')]))
+        self.assertEqual(ce.players[1].possibleCards[1], set([ClueEngine.cardFromChar('F'), ClueEngine.cardFromChar('G'), ClueEngine.cardFromChar('H')]))
        
     def testWriteToString(self):
-        str = '2AH-BCD-KL-MN.-AH.-AH.'
+        str = '29AH-BCD-KL-NM.9-AH.3-AH.'
         self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
-        str = '2-AU.A-BU-CDE-FGH.U-ANSQRTOMP.'
+        str = '29-AU.9A-BU-ECD-FH.3U-ANSQRTOMP.'
         self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
 
 def main():

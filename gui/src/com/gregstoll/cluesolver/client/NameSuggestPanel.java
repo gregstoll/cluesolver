@@ -1,19 +1,22 @@
 package com.gregstoll.cluesolver.client;
 
 import com.google.gwt.user.client.ui.ChangeListener;
-import com.google.gwt.user.client.ui.FlowPanel;
+import com.google.gwt.user.client.ui.HorizontalPanel;
 import com.google.gwt.user.client.ui.HTML;
+import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.MultiWordSuggestOracle;
 import com.google.gwt.user.client.ui.SuggestBox;
 import com.google.gwt.user.client.ui.SuggestionEvent;
 import com.google.gwt.user.client.ui.SuggestionHandler;
+import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.gwt.user.client.ui.Widget;
 import java.util.HashSet;
 import java.util.Set;
 
-public class NameSuggestPanel extends FlowPanel {
+public class NameSuggestPanel extends HorizontalPanel {
     private SuggestBox suggestBox = null;
     private static MultiWordSuggestOracle nameSuggestOracle = null;
+    private ListBox numCardsBox;
     public NameSuggestPanel(String name, int index, ClueSolver cs) {
         super();
         add(new HTML("Name: "));
@@ -37,6 +40,29 @@ public class NameSuggestPanel extends FlowPanel {
             }
         });
         add(suggestBox);
+        numCardsBox = new ListBox();
+        for (int i = 3; i <= 6; ++i) {
+            numCardsBox.addItem(new Integer(i).toString(), new Integer(i).toString());
+        }
+        numCardsBox.addChangeListener(new ChangeListener() {
+            public void onChange(Widget widget) {
+                csFinal.doNewGameRequest();
+            }
+        });
+        add(new HTML("Number of cards:"));
+        add(numCardsBox);
+    }
+
+    public void setDefaultNumCards(int c) {
+        numCardsBox.setSelectedIndex(c - 3);
+    }
+
+    public int getNumCards() {
+        return numCardsBox.getSelectedIndex() + 3;
+    }
+
+    public void setNumCardsEnabled(boolean b) {
+        numCardsBox.setEnabled(b);
     }
 
     private void initNameSuggestOracle() {
