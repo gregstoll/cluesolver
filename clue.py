@@ -14,6 +14,16 @@ def success(str):
     print '{"errorStatus": 0, %s}' % str
     sys.exit(0)
 
+def getClauseInfo(engine):
+    info = {}
+    for i in range(engine.numPlayers):
+        curInfo = []
+        for clause in engine.players[i].possibleCards:
+            curInfo.append(list(clause))
+        if len(curInfo) > 0:
+            info[repr(i)] = curInfo
+    return info
+
 def getInfoFromChangedCards(engine, changedCards):
     info = []
     for card in changedCards:
@@ -67,7 +77,7 @@ if (action == 'whoOwns'):
     owner = int(form.getfirst('owner'))
     card = form.getfirst('card')
     changedCards = engine.infoOnCard(owner, card, True)
-    success('"newInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), engine.writeToString()))
+    success('"newInfo": %s, "clauseInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString()))
 if (action == 'suggestion'):
     # See what the suggestion is
     if (not form.has_key('suggestingPlayer') or not form.has_key('card1') or not form.has_key('card2') or not form.has_key('card3') or not form.has_key('refutingPlayer') or not form.has_key('refutingCard')):
@@ -83,5 +93,5 @@ if (action == 'suggestion'):
     if (refutingCard == "None"):
         refutingCard = None
     changedCards = engine.suggest(suggestingPlayer, card1, card2, card3, refutingPlayer, refutingCard)
-    success('"newInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), engine.writeToString()))
+    success('"newInfo": %s, "clauseInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString()))
 i

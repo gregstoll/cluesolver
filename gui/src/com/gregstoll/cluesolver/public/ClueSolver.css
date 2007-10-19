@@ -26,6 +26,10 @@ a:visited {
   color: darkblue;
 }
 
+.warning {
+  color: red;
+}
+
 .gwt-BorderedPanel {
 }
 

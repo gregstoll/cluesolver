@@ -7,6 +7,7 @@ import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.ClickListener;
 import com.google.gwt.user.client.ui.DialogBox;
+import com.google.gwt.user.client.ui.DisclosurePanel;
 import com.google.gwt.user.client.ui.DockPanel;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.Grid;
@@ -17,7 +18,9 @@ import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.PopupPanel;
 import com.google.gwt.user.client.ui.RadioButton;
 import com.google.gwt.user.client.ui.RootPanel;
+import com.google.gwt.user.client.ui.SourcesTabEvents;
 import com.google.gwt.user.client.ui.TabPanel;
+import com.google.gwt.user.client.ui.TabListener;
 import com.google.gwt.user.client.ui.Tree;
 import com.google.gwt.user.client.ui.TreeItem;
 import com.google.gwt.user.client.ui.VerticalPanel;
@@ -53,6 +56,9 @@ public class ClueSolver implements EntryPoint {
   private ArrayList numPlayersButtons = new ArrayList();
   public static final String scriptName = "clue.cgi";
   public String curSessionString = null;
+  public Tree clauseInfoTree = new Tree();
+  public Label warningLabel = null;
+  private boolean validNumberOfCards = true;
   /*private static class TestPopup extends PopupPanel {
     public TestPopup(String s) {
         super(true);
@@ -63,6 +69,18 @@ public class ClueSolver implements EntryPoint {
         setStyleName("ks-popups-Popup");
     }
   }*/
+
+  private String internalToExternalName(String internalName) {
+    for (int i = 0; i < internalNames.length; ++i) {
+        for (int j = 0; j < internalNames[i].length; ++j) {
+            if (internalName.equals(internalNames[i][j])) {
+                return externalNames[i][j];
+            }
+        }
+    }
+    return "???(" + internalName + ")";
+  }
+
   private static class ConfirmNewGameDialog extends DialogBox implements ClickListener {
       private ClueSolver solver;
       public ConfirmNewGameDialog(ClueSolver _solver) {
@@ -120,12 +138,41 @@ public class ClueSolver implements EntryPoint {
                 }
                 getStateWidget(card).setState(status, owners);
             }
+            clauseInfoTree.removeItems();
+            if (response.containsKey("clauseInfo")) {
+                JSONObject clauseInfoObj = response.get("clauseInfo").isObject();
+                for (int i = 0; i < playerNames.size(); ++i) {
+                    if (clauseInfoObj.containsKey(new Integer(i).toString())) {
+                        JSONArray playerClauseArray = clauseInfoObj.get(new Integer(i).toString()).isArray();
+                        TreeItem playerClauseInfo = new TreeItem(playerNames.get(i) + " has:");
+                        for (int j = 0; j < playerClauseArray.size(); ++j) {
+                            JSONArray curClause = playerClauseArray.get(j).isArray();
+                            StringBuffer clauseBuffer = new StringBuffer();
+                            for (int k = 0; k < curClause.size(); ++k) { 
+                                clauseBuffer.append(internalToExternalName(curClause.get(k).isString().stringValue()));
+                                // TODO - order these nicely?
+                                if (k != curClause.size() - 1) {
+                                    clauseBuffer.append(" or ");
+                                }
+                            }
+                            playerClauseInfo.addItem(clauseBuffer.toString());
+                        }
+                        clauseInfoTree.addItem(playerClauseInfo);
+                        playerClauseInfo.setState(true);
+                    }
+                }
+            }
         }
       }
       public void onError(Throwable ex) {
         Window.alert("Internal error - unable to contact backend - " + ex.getMessage());
       }
   };
+
+  public void setValidNumberOfCards(boolean valid) {
+    validNumberOfCards = valid;
+    warningLabel.setVisible(!valid);
+  }
 
   /**
    * This is the entry point method.
@@ -176,18 +223,23 @@ public class ClueSolver implements EntryPoint {
         namesPanel.add(nsp);
     }
     playerInfoPanel.add(namesPanel);
-    final ClueSolver cluesolver = this;
+    warningLabel = new Label("Total number of cards must total 18!");
+    warningLabel.setStylePrimaryName("warning");
+    warningLabel.setVisible(false);
+    playerInfoPanel.add(warningLabel);
+    final ClueSolver clueSolver = this;
     Button newGameButton = new Button("New game", new ClickListener() {
         public void onClick(Widget sender) {
-            ConfirmNewGameDialog dialog = new ConfirmNewGameDialog(cluesolver);
+            ConfirmNewGameDialog dialog = new ConfirmNewGameDialog(clueSolver);
             dialog.center();
         }
     });
     playerInfoPanel.add(newGameButton);
 
-    HorizontalPanel gameInfoPanel = new HorizontalPanel();
-    gameInfoPanel.setHorizontalAlignment(VerticalPanel.ALIGN_LEFT);
-    gameInfoPanel.setVerticalAlignment(HorizontalPanel.ALIGN_TOP);
+    VerticalPanel gameInfoPanel = new VerticalPanel();
+    HorizontalPanel gameInfoMainPanel = new HorizontalPanel();
+    gameInfoMainPanel.setHorizontalAlignment(VerticalPanel.ALIGN_LEFT);
+    gameInfoMainPanel.setVerticalAlignment(HorizontalPanel.ALIGN_TOP);
 
     Tree infoTree = new Tree();
     TreeItem suspectTree = new TreeItem("Suspects");
@@ -208,7 +260,7 @@ public class ClueSolver implements EntryPoint {
     suspectTree.setState(true);
     weaponTree.setState(true);
     roomTree.setState(true);
-    gameInfoPanel.add(infoTree);
+    gameInfoMainPanel.add(infoTree);
 
     VerticalPanel enterInfoPanel = new VerticalPanel();
     enterInfoPanel.add(new HTML("Enter new info:")); 
@@ -272,11 +324,28 @@ public class ClueSolver implements EntryPoint {
 
     enterInfoTabs.selectTab(0);
     enterInfoPanel.add(enterInfoTabs);
-    gameInfoPanel.add(enterInfoPanel);
+    gameInfoMainPanel.add(enterInfoPanel);
+
+    DisclosurePanel clauseInfoPanel = new DisclosurePanel("Additional information", false);
+    clauseInfoPanel.add(clauseInfoTree);
+
+    gameInfoPanel.add(gameInfoMainPanel);
+    gameInfoPanel.add(clauseInfoPanel);
 
     TabPanel tabs = new TabPanel();
-    tabs.add(playerInfoPanel, "Player Info");
+    tabs.add(playerInfoPanel, "Game Setup");
     tabs.add(gameInfoPanel, "Game Info");
+    tabs.addTabListener(new TabListener() {
+        public boolean onBeforeTabSelected(SourcesTabEvents sender, int tabIndex) {
+            // Don't allow a switch if we're in an invalid state.
+            if (!validNumberOfCards) {
+                return false;
+            }
+            return true;
+        }
+        public void onTabSelected(SourcesTabEvents sender, int tabIndex) {
+        }
+    });
     tabs.selectTab(0);
     RootPanel.get().add(tabs);
 
@@ -340,6 +409,19 @@ public class ClueSolver implements EntryPoint {
     doNewGameRequest(); 
   }
 
+  public void checkTotalNumCards() {
+    int totalNumCards = 0;
+    for (int i = 0; i < playerNames.size(); ++i) {
+        totalNumCards += ((NameSuggestPanel) namesPanel.getWidget(i)).getNumCards();
+    }
+    if (totalNumCards != 18) {
+        setValidNumberOfCards(false);
+    } else {
+        setValidNumberOfCards(true);
+        doNewGameRequest();
+    }
+
+  }
   public void doNewGameRequest() {
     StringBuffer requestStringBuffer = new StringBuffer();
     requestStringBuffer.append("action=new&players=" + playerNames.size());

@@ -46,7 +46,9 @@ public class NameSuggestPanel extends HorizontalPanel {
         }
         numCardsBox.addChangeListener(new ChangeListener() {
             public void onChange(Widget widget) {
-                csFinal.doNewGameRequest();
+                // See if we have a valid number of cards.  If so, make
+                // a new game object.
+                csFinal.checkTotalNumCards();
             }
         });
         add(new HTML("Number of cards:"));
