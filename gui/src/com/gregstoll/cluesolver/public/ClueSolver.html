@@ -1,3 +1,4 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 	<head>
 	
@@ -9,7 +10,7 @@
 		<!--                                           -->
 		<!-- Use normal html, such as style            -->
 		<!--                                           -->
-		<style>
+		<style type="text/css">
 			body,td,a,div,.p{font-family:arial,sans-serif}
 			div,td{color:#000000}
 			a:link,.w,.w a:link{color:#0000cc}
@@ -22,7 +23,7 @@
 		<!-- If you add any GWT meta tags, they must   -->
 		<!-- be added before this line.                -->
 		<!--                                           -->
-		<script language='javascript' src='com.gregstoll.cluesolver.ClueSolver.nocache.js'></script>
+		<script type="text/javascript" language='javascript' src='com.gregstoll.cluesolver.ClueSolver.nocache.js'></script>
 	</head>
 
 	<!--                                           -->
@@ -33,9 +34,35 @@
 	<body>
 
 		<!-- OPTIONAL: include this if you want history support -->
-		<iframe src="javascript:''" id="__gwt_historyFrame" style="width:0;height:0;border:0"></iframe>
+		<!-- <iframe src="javascript:''" id="__gwt_historyFrame" style="width:0;height:0;border:0"></iframe> -->
 
-		<h1>Clue Solver</h1>
-
+        <h1>Clue Solver</h1>
+        <p><a href="#about">About this project</a></p>
+        <div id="main"></div>
+        <p id="about"><b>About this project:</b> <a href="http://en.wikipedia.org/wiki/Cluedo">Clue</a> (or Cluedo outside of North America) is a game published
+by Hasbro in which players make accusations to try to determine who killed Mr.
+Boddy.  This application takes information about the game (including what cards
+you have and which suggestions are disproved by whom) to figure out who has
+which cards, and thus who the killer is.</p>
+        <p>The front-end was developed using the <a href="http://code.google.com/webtoolkit/">Google Web Toolkit</a>, the back-end is written in Python, and
+they communicate in the <a href="http://json.org">JSON</a> data format.
+This was my first project using the Google Web Toolkit, and I didn't spend a lot
+of time prettying things up, etc.</p>
+        <p>I originally tried to write the back-end using first-order logic (see
+<a href="http://gregstoll.livejournal.com/tag/cluesolver">discussions on my
+LiveJournal</a>), and then propositional logic, but ended up rolling my own
+deduction, which was sort of disappointing.</p>
+        <p>Clue is a registered trademark of Hasbro, inc.  <a href="http://www.hasbro.com/games/parkerbrothers/clue/">Official Clue site</a></p>
+  <p>Here are my source files:</p>
+  <ul>
+    <li>TODO</li>
+  </ul>
+  <p><a href="/">Greg's home page</a></p>
+  <p>
+    <a href="http://validator.w3.org/check?uri=referer"><img
+        src="http://www.w3.org/Icons/valid-html401"
+        alt="Valid HTML 4.01 Strict" height="31" width="88"></a>
+  </p>
+    <!--#include virtual="/endOfBody.html"-->
 	</body>
 </html>

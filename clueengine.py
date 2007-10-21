@@ -353,6 +353,10 @@ class ClueEngine:
             # Don't know
             return -1
 
+    def getSimulationData(self):
+        # TODO
+        pass
+
     @classmethod
     def validateCard(cls, card):
         for cardtype in cls.cards:

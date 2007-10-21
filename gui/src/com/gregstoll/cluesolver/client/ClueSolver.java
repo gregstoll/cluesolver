@@ -59,6 +59,9 @@ public class ClueSolver implements EntryPoint {
   public Tree clauseInfoTree = new Tree();
   public Label warningLabel = null;
   private boolean validNumberOfCards = true;
+  private ListBox refutingCard = null;
+  private Label workingLabel = null;
+  private ArrayList actionButtons = new ArrayList();
   /*private static class TestPopup extends PopupPanel {
     public TestPopup(String s) {
         super(true);
@@ -119,6 +122,8 @@ public class ClueSolver implements EntryPoint {
                 ((NameSuggestPanel) namesPanel.getWidget(i)).setNumCardsEnabled(false);
             }
         }
+        // Reset the refuting card to be None to try to prevent errors.
+        refutingCard.setSelectedIndex(0);
         JSONObject response = JSONParser.parse(body).isObject();
         double errorStatus = response.get("errorStatus").isNumber().getValue();
         if (errorStatus != 0.0) {
@@ -150,7 +155,7 @@ public class ClueSolver implements EntryPoint {
                             StringBuffer clauseBuffer = new StringBuffer();
                             for (int k = 0; k < curClause.size(); ++k) { 
                                 clauseBuffer.append(internalToExternalName(curClause.get(k).isString().stringValue()));
-                                // TODO - order these nicely?
+                                // FFV - order these nicely?
                                 if (k != curClause.size() - 1) {
                                     clauseBuffer.append(" or ");
                                 }
@@ -163,15 +168,31 @@ public class ClueSolver implements EntryPoint {
                 }
             }
         }
+        setWorking(false);
       }
       public void onError(Throwable ex) {
         Window.alert("Internal error - unable to contact backend - " + ex.getMessage());
+        setWorking(false);
       }
   };
 
   public void setValidNumberOfCards(boolean valid) {
     validNumberOfCards = valid;
     warningLabel.setVisible(!valid);
+  }
+
+  public void setWorking(boolean working) {
+    if (!working) {
+        workingLabel.setVisible(false);
+    } else {
+        workingLabel.setVisible(true);
+        workingLabel.setText("Working...");
+    }
+    // Enable or disable the buttons.
+    for (int i = 0; i < actionButtons.size(); ++i) {
+        Button curButton = (Button) actionButtons.get(i);
+        curButton.setEnabled(!working);
+    }
   }
 
   /**
@@ -278,9 +299,11 @@ public class ClueSolver implements EntryPoint {
     whoOwnsCardPanel.add(tempPanel1);
     Button whoOwnsSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
+            setWorking(true);
             CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=whoOwns&owner=" + listBoxValue(ownerOwned) + "&card=" + listBoxValue(whichCardOwned), newInfoHandler);
         }
     });
+    actionButtons.add(whoOwnsSubmitButton);
     whoOwnsCardPanel.add(whoOwnsSubmitButton);
     enterInfoTabs.add(whoOwnsCardPanel, "Who owns a card");
     VerticalPanel suggestionMadePanel = new VerticalPanel();
@@ -311,19 +334,24 @@ public class ClueSolver implements EntryPoint {
     suggestionMadePanel.add(tempPanel1);
     tempPanel1 = new HorizontalPanel();
     tempPanel1.add(new HTML("Refuting card: "));
-    final ListBox refutingCard = makeNewCardListBox(-1, true);
+    refutingCard = makeNewCardListBox(-1, true);
     tempPanel1.add(refutingCard);
     suggestionMadePanel.add(tempPanel1);
     Button suggestionSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
+            setWorking(true);
             CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=suggestion&suggestingPlayer=" + listBoxValue(suggestingPlayer) + "&card1=" + listBoxValue(card1) + "&card2=" + listBoxValue(card2) + "&card3=" + listBoxValue(card3) + "&refutingPlayer=" + listBoxValue(refutingPlayer) + "&refutingCard=" + listBoxValue(refutingCard), newInfoHandler);
         }
     });
+    actionButtons.add(suggestionSubmitButton);
     suggestionMadePanel.add(suggestionSubmitButton);
     enterInfoTabs.add(suggestionMadePanel, "Suggestion made");
 
     enterInfoTabs.selectTab(0);
     enterInfoPanel.add(enterInfoTabs);
+    workingLabel = new Label();
+    workingLabel.setVisible(false);
+    enterInfoPanel.add(workingLabel);
     gameInfoMainPanel.add(enterInfoPanel);
 
     DisclosurePanel clauseInfoPanel = new DisclosurePanel("Additional information", false);
@@ -347,7 +375,7 @@ public class ClueSolver implements EntryPoint {
         }
     });
     tabs.selectTab(0);
-    RootPanel.get().add(tabs);
+    RootPanel.get("main").add(tabs);
 
     // Get the state of the game.
     setNumberOfPlayers(6);
