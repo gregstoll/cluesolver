@@ -48,8 +48,8 @@ if (form.has_key('action')):
     action = form.getfirst('action')
 else:
     error("Internal error - No action specified!")
-# Valid actions are 'new', 'whoOwns', 'suggestion', 'moreInfo' ('accusation' in the future?)
-if (action != 'new' and action != 'whoOwns' and action != 'suggestion' and action != 'moreInfo'):
+# Valid actions are 'new', 'whoOwns', 'suggestion', 'fullInfo' ('accusation' in the future?)
+if (action != 'new' and action != 'whoOwns' and action != 'suggestion' and action != 'fullInfo'):
     error("Internal error - invalid action '%s'!" % action)
 if (action != 'new' and (not form.has_key('sess'))):
     error("Internal error - missing sess!")
@@ -94,4 +94,5 @@ if (action == 'suggestion'):
         refutingCard = None
     changedCards = engine.suggest(suggestingPlayer, card1, card2, card3, refutingPlayer, refutingCard)
     success('"newInfo": %s, "clauseInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString()))
-i
+if (action == 'fullInfo'):
+    success('"newInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, reduce(lambda x, y: x+y, [engine.cards[x] for x in engine.cards]))), engine.writeToString()))

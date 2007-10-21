@@ -5,6 +5,7 @@ import com.google.gwt.http.client.RequestBuilder;
 import com.google.gwt.http.client.URL;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.Button;
+import com.google.gwt.user.client.ui.ChangeListener;
 import com.google.gwt.user.client.ui.ClickListener;
 import com.google.gwt.user.client.ui.DialogBox;
 import com.google.gwt.user.client.ui.DisclosurePanel;
@@ -62,6 +63,8 @@ public class ClueSolver implements EntryPoint {
   private ListBox refutingCard = null;
   private Label workingLabel = null;
   private ArrayList actionButtons = new ArrayList();
+  private ListBox undoHistoryBox = null;
+  
   /*private static class TestPopup extends PopupPanel {
     public TestPopup(String s) {
         super(true);
@@ -73,6 +76,10 @@ public class ClueSolver implements EntryPoint {
     }
   }*/
 
+  public void addActionToHistory(String description, String state) {
+    undoHistoryBox.addItem(description, description + "|" + state);
+  }
+
   private String internalToExternalName(String internalName) {
     for (int i = 0; i < internalNames.length; ++i) {
         for (int j = 0; j < internalNames[i].length; ++j) {
@@ -81,7 +88,23 @@ public class ClueSolver implements EntryPoint {
             }
         }
     }
+    if (internalName == "None") {
+        return "None/Unknown";
+    }
     return "???(" + internalName + ")";
+  }
+
+  private String getPlayerName(int index) {
+     if (index >= 0 && index < playerNames.size()) {
+         return (String) playerNames.get(index);
+     }
+     if (index == -1) {
+         return "None";
+     }
+     if (index == playerNames.size()) {
+         return "Solution (case file)";
+     }
+     return "???";
   }
 
   private static class ConfirmNewGameDialog extends DialogBox implements ClickListener {
@@ -300,6 +323,7 @@ public class ClueSolver implements EntryPoint {
     Button whoOwnsSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
             setWorking(true);
+            addActionToHistory(internalToExternalName(listBoxValue(whichCardOwned)) + " owned by " + getPlayerName(Integer.parseInt(listBoxValue(ownerOwned))), curSessionString);
             CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=whoOwns&owner=" + listBoxValue(ownerOwned) + "&card=" + listBoxValue(whichCardOwned), newInfoHandler);
         }
     });
@@ -340,6 +364,7 @@ public class ClueSolver implements EntryPoint {
     Button suggestionSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
             setWorking(true);
+            addActionToHistory(getPlayerName(Integer.parseInt(listBoxValue(suggestingPlayer))) + " suggested " + internalToExternalName(listBoxValue(card1)) + ", " + internalToExternalName(listBoxValue(card2)) + ", " + internalToExternalName(listBoxValue(card3)) + " - refuted by " + getPlayerName(Integer.parseInt(listBoxValue(refutingPlayer))) + " with card " + internalToExternalName(listBoxValue(refutingCard)), curSessionString);
             CgiHelper.doRequest(RequestBuilder.POST, scriptName, "sess=" + curSessionString + "&action=suggestion&suggestingPlayer=" + listBoxValue(suggestingPlayer) + "&card1=" + listBoxValue(card1) + "&card2=" + listBoxValue(card2) + "&card3=" + listBoxValue(card3) + "&refutingPlayer=" + listBoxValue(refutingPlayer) + "&refutingCard=" + listBoxValue(refutingCard), newInfoHandler);
         }
     });
@@ -360,9 +385,40 @@ public class ClueSolver implements EntryPoint {
     gameInfoPanel.add(gameInfoMainPanel);
     gameInfoPanel.add(clauseInfoPanel);
 
+    VerticalPanel undoHistoryPanel = new VerticalPanel();
+    Label undoHistoryLabel = new Label("List of information:");
+    undoHistoryPanel.add(undoHistoryLabel);
+    undoHistoryBox = new ListBox();
+    undoHistoryBox.setVisibleItemCount(15);
+    undoHistoryBox.addChangeListener(new ChangeListener() {
+        public void onChange(Widget widget) {
+            // Don't let them select anything but the bottom one, lest they
+            // think they can undo other things.
+            undoHistoryBox.setSelectedIndex(undoHistoryBox.getItemCount() - 1);
+        }
+    });
+    undoHistoryPanel.add(undoHistoryBox);
+    Button undoButton = new Button("Undo latest information", new ClickListener() {
+        public void onClick(Widget widget) {
+            // Get the new status
+            String descriptionAndState = undoHistoryBox.getValue(undoHistoryBox.getItemCount() - 1);
+            // There could be a | in the name but not in the description, so
+            // look for the last one.
+            curSessionString = descriptionAndState.substring(descriptionAndState.lastIndexOf('|') + 1);
+            // Remove the last info from the listbox and get new status.
+            undoHistoryBox.removeItem(undoHistoryBox.getItemCount() - 1);
+            setWorking(true);
+            CgiHelper.doRequest(RequestBuilder.GET, scriptName, "sess=" + curSessionString + "&action=fullInfo", newInfoHandler);
+        }
+    });
+    actionButtons.add(undoButton);
+    undoHistoryPanel.add(undoButton);
+    
+
     TabPanel tabs = new TabPanel();
     tabs.add(playerInfoPanel, "Game Setup");
     tabs.add(gameInfoPanel, "Game Info");
+    tabs.add(undoHistoryPanel, "Undo and History");
     tabs.addTabListener(new TabListener() {
         public boolean onBeforeTabSelected(SourcesTabEvents sender, int tabIndex) {
             // Don't allow a switch if we're in an invalid state.
@@ -475,6 +531,7 @@ public class ClueSolver implements EntryPoint {
   }
 
   public void startNewGame() {
+    undoHistoryBox.clear();
     if (infoAdded == true) {
         infoAdded = false;
         for (int i = 0; i < numPlayersButtons.size(); ++i) {
