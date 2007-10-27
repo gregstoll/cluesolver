@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import unittest, sets, copy
+import unittest, sets, copy, random
 
 class PlayerData:
     def __init__(self, clueengine, numCards, isSolutionPlayer=False):
@@ -305,8 +305,6 @@ class ClueEngine:
     def infoOnCard(self, playerIndex, card, hasCard):
         return self.players[playerIndex].infoOnCard(card, hasCard)
 
-    # TODO - accusations as well
-    # TODO - simulations as well?
     def suggest(self, suggestingPlayer, card1, card2, card3, refutingPlayer, cardShown):
         changedCards = set()
         self.validateCard(card1)
@@ -354,8 +352,79 @@ class ClueEngine:
             return -1
 
     def getSimulationData(self):
-        # TODO
-        pass
+        simData = {}
+        for cardtype in self.cards:
+            for card in self.cards[cardtype]:
+                simData[card] = [0 for x in range(self.numPlayers + 1)]
+        numSimulations = 0
+        # Make sure we know how many cards each player has.
+        for player in self.players:
+            if player.numCards == -1:
+                return simData
+        # Find a solution to simulate.
+        # FFV - this iteration could be more generalized
+        solutionPossibilities = {}
+        for cardtype in self.cards:
+            commonCards = set(self.cards[cardtype]).intersection(self.players[self.numPlayers].hasCards)
+            if (len(commonCards) > 0):
+                # We know what the solution is for this card already
+                solutionPossibilities[cardtype] = [list(commonCards)[0]]
+            else:
+                # Take all possible cards, except for the ones we know aren't
+                # solutions
+                solutionPossibilities[cardtype] = list(set(self.cards[cardtype]).difference(set(self.players[self.numPlayers].notHasCards)))
+        #print solutionPossibilities
+        totalIterations = 2000
+        iterationsPerSoln = totalIterations / reduce(lambda x,y:x*y, [len(solutionPossibilities[x]) for x in solutionPossibilities])
+        for card1 in solutionPossibilities['weapon']:
+            for card2 in solutionPossibilities['suspect']:
+                for card3 in solutionPossibilities['room']:
+                    curSolution = [card1, card2, card3]
+                    solnEngine = copy.deepcopy(self)
+                    for solnCard in curSolution:
+                        solnEngine.infoOnCard(solnEngine.numPlayers, solnCard, True)
+                    # Find the available free cards.
+                    cardsAvailable = set()
+                    for cardtype in solnEngine.cards:
+                        cardsAvailable.update(set(self.cards[cardtype]))
+                    for player in solnEngine.players:
+                        cardsAvailable.difference_update(set(player.hasCards))
+                    for unused in xrange(iterationsPerSoln):
+                        tempEngine = copy.deepcopy(solnEngine)
+                        tempCardsAvailable = copy.deepcopy(cardsAvailable)
+                        # Assign all values randomly.
+                        for playerIdx in range(tempEngine.numPlayers - 1):
+                            player = tempEngine.players[playerIdx]
+                            numCardsNeeded = player.numCards - len(player.hasCards)
+                            playerCardsAvailable = list(tempCardsAvailable.difference(player.notHasCards))
+                            #print "engine: %s ***cardsavailable: %s" % (repr(tempEngine), playerCardsAvailable)
+                            #print "available: %d numCardsNeeded: %d" % (len(playerCardsAvailable), numCardsNeeded)
+                            # If there are not enough cards available, we're
+                            # inconsistent.
+                            if (len(playerCardsAvailable) < numCardsNeeded):
+                                tempCardsAvailable = []
+                            else:
+                                for i in range(numCardsNeeded):
+                                    cardToAdd = random.choice(playerCardsAvailable)
+                                    #print "adding card: %s" % cardToAdd
+                                    tempCardsAvailable.remove(cardToAdd)
+                                    playerCardsAvailable.remove(cardToAdd)
+                                   # print "now tempCardsAvailable, playerCardsAvailable is %d, %d long" % (len(tempCardsAvailable), len(playerCardsAvailable))
+                                    tempEngine.infoOnCard(playerIdx, cardToAdd, True)
+                                    #print "engine: %s" % repr(tempEngine)
+                            # All players assigned.  Check consistency.
+                        isConsistent = True
+                        for player in tempEngine.players:
+                            if (len(player.hasCards.intersection(player.notHasCards)) > 0 or len(player.hasCards) != player.numCards):
+                                #print "hasNot: %d, hasCards: %d" % (len(player.hasCards.intersection(player.notHasCards)), len(player.hasCards))
+                                isConsistent = False
+                        if (isConsistent):
+                            # Update statistics
+                            numSimulations += 1
+                            for playerIdx in range(tempEngine.numPlayers + 1):
+                                for card in tempEngine.players[playerIdx].hasCards:
+                                    simData[card][playerIdx] += 1
+        return simData        
 
     @classmethod
     def validateCard(cls, card):
@@ -372,22 +441,30 @@ class ClueEngine:
         # - Check also for all cards except one in a category are
         # accounted for.
         for i in range(self.numPlayers + 1):
-            if (card in self.players[i].hasCards):
+            player = self.players[i]
+            if (card in player.hasCards):
                 # Someone has the card, so the solution is not this
                 someoneHasCard = True
-            elif (card in self.players[i].notHasCards):
+                # Exit the loop.
+                i = self.numPlayers + 2
+            elif (card in player.notHasCards):
                 numWhoDontHaveCard += 1
             else:
-                playerWhoMightHaveCard = i
+                if (playerWhoMightHaveCard == -1):
+                    playerWhoMightHaveCard = i
+                else:
+                    # The solution is not this.  Exit the loop.
+                    i = self.numPlayers + 2
         if ((not someoneHasCard) and (numWhoDontHaveCard == self.numPlayers)):
             # Every player except one doesn't have this card, so we know the player has it.
             changedCards.update(self.players[playerWhoMightHaveCard].infoOnCard(card, True, updateClueEngine=False))
         elif (someoneHasCard):
             # Someone has this card, so no one else does. (including solution)
-            for i in range(self.numPlayers + 1):
-                if (card not in self.players[i].hasCards):
-                    changedCards.update(self.players[i].infoOnCard(card, False, updateClueEngine=False))
+            for player in self.players:
+                if (card not in player.hasCards):
+                    changedCards.update(player.infoOnCard(card, False, updateClueEngine=False))
         # Now see if we've deduced a solution.
+        # TODO - can avoid doing this for other types?
         for cardtype in self.cards:
             allCards = self.cards[cardtype][:]
             solutionCard = None
@@ -395,11 +472,11 @@ class ClueEngine:
             for testCard in allCards:
                 # See if anyone has this card
                 cardOwned = False
-                for i in range(self.numPlayers):
-                    if (testCard in self.players[i].hasCards):
+                for player in self.players:
+                    if (testCard in player.hasCards):
                         # someone has it, mark it as such
                         cardOwned = True
-                if (cardOwned == False):
+                if (not cardOwned):
                     # If there's another possibility, we don't know which is
                     # right.
                     if (solutionCard != None):
@@ -407,9 +484,9 @@ class ClueEngine:
                         isSolution = False
                     else:
                         solutionCard = testCard
-            if (isSolution):
+            if (isSolution and solutionCard != None):
                 # There's only one possibility, so this must be it!
-                if (solutionCard not in self.players[self.numPlayers].hasCards):
+                if (solutionCard not in self.players[self.numPlayers].hasCards and solutionCard not in self.players[self.numPlayers].notHasCards):
                     self.players[self.numPlayers].hasCards.add(solutionCard)
                     changedCards.add(solutionCard)
         return changedCards
@@ -623,9 +700,16 @@ class TestCaseClueEngine(unittest.TestCase):
 
 def main():
     ce = ClueEngine()
+    #cc = ce.infoOnCard(6, 'Hall', True)
+    #cc = ce.infoOnCard(6, 'ProfessorPlum', False)
+    #cc = ce.infoOnCard(6, 'Revolver', True)
+    #print "%s" % repr(ce.getSimulationData())
+
 
 if (__name__ == '__main__'):
     testRunner = unittest.TextTestRunner()
     testSuite = unittest.TestLoader().loadTestsFromTestCase(TestCaseClueEngine)
     testRunner.run(testSuite)
-    main()
+    #import profile
+    #profile.run('main()')
+    #main()

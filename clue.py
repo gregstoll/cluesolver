@@ -48,8 +48,8 @@ if (form.has_key('action')):
     action = form.getfirst('action')
 else:
     error("Internal error - No action specified!")
-# Valid actions are 'new', 'whoOwns', 'suggestion', 'fullInfo' ('accusation' in the future?)
-if (action != 'new' and action != 'whoOwns' and action != 'suggestion' and action != 'fullInfo'):
+# Valid actions are 'new', 'whoOwns', 'suggestion', 'fullInfo', 'simulate' ('accusation' in the future?)
+if (action != 'new' and action != 'whoOwns' and action != 'suggestion' and action != 'fullInfo' and action != 'simulate'):
     error("Internal error - invalid action '%s'!" % action)
 if (action != 'new' and (not form.has_key('sess'))):
     error("Internal error - missing sess!")
@@ -95,4 +95,6 @@ if (action == 'suggestion'):
     changedCards = engine.suggest(suggestingPlayer, card1, card2, card3, refutingPlayer, refutingCard)
     success('"newInfo": %s, "clauseInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString()))
 if (action == 'fullInfo'):
-    success('"newInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, reduce(lambda x, y: x+y, [engine.cards[x] for x in engine.cards]))), engine.writeToString()))
+    success('"newInfo": %s, "clauseInfo": %s, "session": "%s", "numPlayers": %d, "numCards": %s' % (json.write(getInfoFromChangedCards(engine, reduce(lambda x, y: x+y, [engine.cards[x] for x in engine.cards]))), json.write(getClauseInfo(engine)), engine.writeToString(), engine.numPlayers, json.write([x.numCards for x in engine.players[:-1]])))
+if (action == 'simulate'):
+    success('"simData": %s' % json.write(engine.getSimulationData()))

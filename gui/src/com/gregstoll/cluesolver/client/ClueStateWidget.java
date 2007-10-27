@@ -37,10 +37,11 @@ public class ClueStateWidget extends HorizontalPanel {
         AbstractImagePrototype unknown();
     }
 
-    private Images images = (Images) GWT.create(Images.class);
+    private Images images = null;
     private Image curImage = new Image();
 
-    public ClueStateWidget(String privateName, String publicName) {
+    public ClueStateWidget(Images images, String privateName, String publicName) {
+        this.images = images;
         this.privateName = privateName;
         this.publicName = publicName;
         curState = STATE_UNKNOWN;

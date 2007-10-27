@@ -346,14 +346,17 @@ a:visited {
 
 .gwt-SuggestBoxPopup {
   border: 2px solid #C3D9FF;
+  background-color: #E8EEF7;
 }
 
 .gwt-SuggestBoxPopup .item {
+  background-color: #E8EEF7;
   padding: 2px;
 }
 
 .gwt-SuggestBoxPopup .item-selected {
-  background-color: #C3D9FF;
+  /* background-color: #C3D9FF; */
+  background-color: #87B3FF;
   padding: 2px;
 }
 
