@@ -72,6 +72,7 @@ public class ClueSolver implements EntryPoint {
   private Label gameStateLabel = null;
   private TextBox loadGameBox = null;
   private ArrayList playerRadioButtons = null;
+  public Label consistentLabel = null;
 
   /**
    * Aggregate the images
@@ -206,6 +207,10 @@ public class ClueSolver implements EntryPoint {
                 }
             }
         }
+        if (response.containsKey("isConsistent")) {
+            boolean isConsistent = response.get("isConsistent").isBoolean().booleanValue();
+            setIsConsistent(isConsistent);
+        }
     }
   }
 
@@ -260,7 +265,12 @@ public class ClueSolver implements EntryPoint {
                         total += dataArray.get(k).isNumber().getValue();
                     }
                     for (int k = 0; k < dataArray.size(); ++k) {
-                        double percent = (dataArray.get(k).isNumber().getValue() * 100) / total;
+                        double percent;
+                        if (total > 0.0) {
+                            percent = (dataArray.get(k).isNumber().getValue() * 100) / total;
+                        } else {
+                            percent = 0.0;
+                        }
                         percent = ((int) (percent * 10)) / 10.0;
                         double percentTo255 = percent * (255.0/100.0);
                         int red = 0;
@@ -296,6 +306,11 @@ public class ClueSolver implements EntryPoint {
   public void setValidNumberOfCards(boolean valid) {
     validNumberOfCards = valid;
     warningLabel.setVisible(!valid);
+  }
+
+  public void setIsConsistent(boolean isConsistent) {
+      consistentLabel.setVisible(!isConsistent);
+      // TODO - do more?
   }
 
   public void setWorking(boolean working) {
@@ -481,6 +496,29 @@ public class ClueSolver implements EntryPoint {
     tempPanel1.add(new HTML("Refuting card: "));
     refutingCard = makeNewCardListBox(-1, true);
     tempPanel1.add(refutingCard);
+    ChangeListener updateRefutingCardListener = new ChangeListener() {
+        public void onChange(Widget widget) {
+            int originalSelectedIndex = refutingCard.getSelectedIndex();
+            // Clear out everything except for None/Unknown
+            while (refutingCard.getItemCount() > 1) {
+                refutingCard.removeItem(1);
+            }
+            // Add the possibilities to this listbox.
+            String internalCard1 = listBoxValue(card1);
+            refutingCard.addItem(internalToExternalName(internalCard1), internalCard1);
+            String internalCard2 = listBoxValue(card2);
+            refutingCard.addItem(internalToExternalName(internalCard2), internalCard2);
+            String internalCard3 = listBoxValue(card3);
+            refutingCard.addItem(internalToExternalName(internalCard3), internalCard3);
+            refutingCard.setSelectedIndex(originalSelectedIndex);
+        }
+    };
+    card1.addChangeListener(updateRefutingCardListener);
+    card2.addChangeListener(updateRefutingCardListener);
+    card3.addChangeListener(updateRefutingCardListener);
+    // Trigger a change to make the refuting card show up correctly at the
+    // beginning.
+    updateRefutingCardListener.onChange(null);
     suggestionMadePanel.add(tempPanel1);
     Button suggestionSubmitButton = new Button("Add info", new ClickListener() {
         public void onClick(Widget sender) {
@@ -504,6 +542,10 @@ public class ClueSolver implements EntryPoint {
     DisclosurePanel clauseInfoPanel = new DisclosurePanel("Additional information", false);
     clauseInfoPanel.add(clauseInfoTree);
 
+    consistentLabel = new Label("Game is no longer consistent!");
+    consistentLabel.setStylePrimaryName("warning");
+    consistentLabel.setVisible(false);
+    gameInfoPanel.add(consistentLabel);
     gameInfoPanel.add(gameInfoMainPanel);
     gameInfoPanel.add(clauseInfoPanel);
 
@@ -666,6 +708,10 @@ public class ClueSolver implements EntryPoint {
             for (int j = 0; j > deltaNumP; --j) {
                 listBox.removeItem(listBox.getItemCount() - 1 - endCorrection);
             }
+        }
+        // Fix the extra item (solution) value at the end, if there is one.
+        if (endCorrection == 1) {
+           listBox.setValue(listBox.getItemCount() - 1, new Integer(numP).toString());
         }
     }
     // Update the simulation table

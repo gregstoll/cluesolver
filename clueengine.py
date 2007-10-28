@@ -302,6 +302,13 @@ class ClueEngine:
         str += '.'
         return str
 
+    def isConsistent(self):
+        isConsistent = True
+        for player in self.players:
+            if (len(player.hasCards.intersection(player.notHasCards)) > 0):
+                isConsistent = False
+        return isConsistent
+
     def infoOnCard(self, playerIndex, card, hasCard):
         return self.players[playerIndex].infoOnCard(card, hasCard)
 
@@ -412,7 +419,7 @@ class ClueEngine:
                                    # print "now tempCardsAvailable, playerCardsAvailable is %d, %d long" % (len(tempCardsAvailable), len(playerCardsAvailable))
                                     tempEngine.infoOnCard(playerIdx, cardToAdd, True)
                                     #print "engine: %s" % repr(tempEngine)
-                            # All players assigned.  Check consistency.
+                        # All players assigned.  Check consistency.
                         isConsistent = True
                         for player in tempEngine.players:
                             if (len(player.hasCards.intersection(player.notHasCards)) > 0 or len(player.hasCards) != player.numCards):

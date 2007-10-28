@@ -77,7 +77,7 @@ if (action == 'whoOwns'):
     owner = int(form.getfirst('owner'))
     card = form.getfirst('card')
     changedCards = engine.infoOnCard(owner, card, True)
-    success('"newInfo": %s, "clauseInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString()))
+    success('"newInfo": %s, "clauseInfo": %s, "session": "%s", "isConsistent": %s' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString(), json.write(engine.isConsistent())))
 if (action == 'suggestion'):
     # See what the suggestion is
     if (not form.has_key('suggestingPlayer') or not form.has_key('card1') or not form.has_key('card2') or not form.has_key('card3') or not form.has_key('refutingPlayer') or not form.has_key('refutingCard')):
@@ -93,8 +93,8 @@ if (action == 'suggestion'):
     if (refutingCard == "None"):
         refutingCard = None
     changedCards = engine.suggest(suggestingPlayer, card1, card2, card3, refutingPlayer, refutingCard)
-    success('"newInfo": %s, "clauseInfo": %s, "session": "%s"' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString()))
+    success('"newInfo": %s, "clauseInfo": %s, "session": "%s", "isConsistent": %s' % (json.write(getInfoFromChangedCards(engine, changedCards)), json.write(getClauseInfo(engine)), engine.writeToString(), json.write(engine.isConsistent())))
 if (action == 'fullInfo'):
-    success('"newInfo": %s, "clauseInfo": %s, "session": "%s", "numPlayers": %d, "numCards": %s' % (json.write(getInfoFromChangedCards(engine, reduce(lambda x, y: x+y, [engine.cards[x] for x in engine.cards]))), json.write(getClauseInfo(engine)), engine.writeToString(), engine.numPlayers, json.write([x.numCards for x in engine.players[:-1]])))
+    success('"newInfo": %s, "clauseInfo": %s, "session": "%s", "numPlayers": %d, "numCards": %s, "isConsistent": %s' % (json.write(getInfoFromChangedCards(engine, reduce(lambda x, y: x+y, [engine.cards[x] for x in engine.cards]))), json.write(getClauseInfo(engine)), engine.writeToString(), engine.numPlayers, json.write([x.numCards for x in engine.players[:-1]]), json.write(engine.isConsistent())))
 if (action == 'simulate'):
     success('"simData": %s' % json.write(engine.getSimulationData()))
