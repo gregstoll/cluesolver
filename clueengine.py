@@ -326,9 +326,11 @@ class ClueEngine:
                     changedCards.update(self.players[curPlayer].infoOnCard(cardShown, True))
                 else:
                     changedCards.update(self.players[curPlayer].hasOneOfCards([card1, card2, card3]))
+                changedCards.update(self.checkSolution(None))
                 return changedCards
             elif (suggestingPlayer == curPlayer):
                 # No one can refute this.  We're done.
+                changedCards.update(self.checkSolution(None))
                 return changedCards
             else:
                 changedCards.update(self.players[curPlayer].infoOnCard(card1, False))
@@ -442,36 +444,37 @@ class ClueEngine:
 
     def checkSolution(self, card):
         changedCards = set()
-        someoneHasCard = False
-        numWhoDontHaveCard = 0
-        playerWhoMightHaveCard = -1
-        # - Check also for all cards except one in a category are
-        # accounted for.
-        for i in range(self.numPlayers + 1):
-            player = self.players[i]
-            if (card in player.hasCards):
-                # Someone has the card, so the solution is not this
-                someoneHasCard = True
-                # Exit the loop.
-                i = self.numPlayers + 2
-            elif (card in player.notHasCards):
-                numWhoDontHaveCard += 1
-            else:
-                if (playerWhoMightHaveCard == -1):
-                    playerWhoMightHaveCard = i
-                else:
-                    # The solution is not this.  Exit the loop.
+        if (card != None):
+            someoneHasCard = False
+            numWhoDontHaveCard = 0
+            playerWhoMightHaveCard = -1
+            # - Check also for all cards except one in a category are
+            # accounted for.
+            for i in range(self.numPlayers + 1):
+                player = self.players[i]
+                if (card in player.hasCards):
+                    # Someone has the card, so the solution is not this
+                    someoneHasCard = True
+                    # Exit the loop.
                     i = self.numPlayers + 2
-        if ((not someoneHasCard) and (numWhoDontHaveCard == self.numPlayers)):
-            # Every player except one doesn't have this card, so we know the player has it.
-            changedCards.update(self.players[playerWhoMightHaveCard].infoOnCard(card, True, updateClueEngine=False))
-        elif (someoneHasCard):
-            # Someone has this card, so no one else does. (including solution)
-            for player in self.players:
-                if (card not in player.hasCards):
-                    changedCards.update(player.infoOnCard(card, False, updateClueEngine=False))
-        # Now see if we've deduced a solution.
-        # TODO - can avoid doing this for other types?
+                elif (card in player.notHasCards):
+                    numWhoDontHaveCard += 1
+                else:
+                    if (playerWhoMightHaveCard == -1):
+                        playerWhoMightHaveCard = i
+                    else:
+                        # The solution is not this.  Exit the loop.
+                        i = self.numPlayers + 2
+            if ((not someoneHasCard) and (numWhoDontHaveCard == self.numPlayers)):
+                # Every player except one doesn't have this card, so we know the player has it.
+                changedCards.update(self.players[playerWhoMightHaveCard].infoOnCard(card, True, updateClueEngine=False))
+            elif (someoneHasCard):
+                # Someone has this card, so no one else does. (including solution)
+                for player in self.players:
+                    if (card not in player.hasCards):
+                        changedCards.update(player.infoOnCard(card, False, updateClueEngine=False))
+            # Now see if we've deduced a solution.
+        # FFV - can avoid doing this for other types?
         for cardtype in self.cards:
             allCards = self.cards[cardtype][:]
             solutionCard = None
@@ -496,6 +499,28 @@ class ClueEngine:
                 if (solutionCard not in self.players[self.numPlayers].hasCards and solutionCard not in self.players[self.numPlayers].notHasCards):
                     self.players[self.numPlayers].hasCards.add(solutionCard)
                     changedCards.add(solutionCard)
+        # Finally, see if any people share clauses in common.
+        clauseHash = {}
+        for idx in range(self.numPlayers):
+            player = self.players[idx]
+            for clause in player.possibleCards:
+                # Sets are mutable so we have to add these as frozensets
+                toAdd = frozenset(clause)
+                if (toAdd in clauseHash):
+                    clauseHash[toAdd].append(idx)
+                else:
+                    clauseHash[toAdd] = [idx]
+        for clause in clauseHash:
+            # If n people all have an n-length clause, no one else can have
+            # a card in that clause.
+            if (len(clause) <= len(clauseHash[clause])):
+                affectedPeople = clauseHash[clause]
+                changedCards.update(set(clause))
+                for idx in range(self.numPlayers + 1):
+                    if idx not in affectedPeople:
+                        for card in clause:
+                            if card not in self.players[idx].notHasCards:
+                                changedCards.update(self.infoOnCard(idx, card, False))
         return changedCards
 
 class TestCaseClueEngine(unittest.TestCase):
@@ -644,7 +669,36 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(cc, set(['ProfessorPlum', 'Knife', 'Lounge']))
         self.assertEqual(len(ce.players[2].possibleCards), 1)
         self.assertEqual(ce.players[2].possibleCards[0], set(['ProfessorPlum', 'Knife']))
- 
+
+    def testSharedClause(self):
+        ce = ClueEngine()
+        cc = ce.infoOnCard(1, 'Hall', False)
+        self.assertEqual(cc, set(['Hall']))
+        cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 1, None)
+        self.assertEqual(cc, set())
+        cc = ce.suggest(2, 'ProfessorPlum', 'Knife', 'Hall', 3, None)
+        self.assertEqual(cc, set())
+        cc = ce.infoOnCard(3, 'Hall', False)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Knife', 'Hall']))
+        # No one else should have ProfessorPlum or Knife
+        self.assertEqual(ce.whoHasCard('ProfessorPlum'), [1,3])
+        self.assertEqual(ce.whoHasCard('Knife'), [1,3])
+        self.assertEqual(ce.whoHasCard('Hall'), [0,2,4,5,6])
+
+        ce = ClueEngine()
+        cc = ce.infoOnCard(1, 'Hall', False)
+        self.assertEqual(cc, set(['Hall']))
+        cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 1, None)
+        self.assertEqual(cc, set())
+        cc = ce.infoOnCard(3, 'Hall', False)
+        self.assertEqual(cc, set(['Hall']))
+        cc = ce.suggest(2, 'ProfessorPlum', 'Knife', 'Hall', 3, None)
+        self.assertEqual(cc, set(['ProfessorPlum', 'Knife']))
+        # No one else should have ProfessorPlum or Knife
+        self.assertEqual(ce.whoHasCard('ProfessorPlum'), [1,3])
+        self.assertEqual(ce.whoHasCard('Knife'), [1,3])
+        self.assertEqual(ce.whoHasCard('Hall'), [0,2,4,5,6])
+
     def testCardFromChar(self):
         self.assertEqual(ClueEngine.cardFromChar('A'), 'ProfessorPlum')
         self.assertEqual(ClueEngine.cardFromChar('B'), 'ColonelMustard')
