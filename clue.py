@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import elementtree.ElementTree as ET
+import xml.etree.ElementTree as ET
 import cgi, sys, json
 import clueengine
 
