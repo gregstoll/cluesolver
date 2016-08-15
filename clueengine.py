@@ -1,13 +1,13 @@
 #!/usr/bin/python
 
-import unittest, sets, copy, random
+import unittest, copy, random
 
 class PlayerData:
     def __init__(self, clueengine, numCards, isSolutionPlayer=False):
         # A set of cards that the player is known to have
-        self.hasCards = sets.Set()
+        self.hasCards = set()
         # A set of cards that the player is known not to have
-        self.notHasCards = sets.Set()
+        self.notHasCards = set()
         # A list of clauses.  Each clause is a set of cards, one of which
         # the player is known to have.
         self.possibleCards = []
@@ -140,9 +140,12 @@ class PlayerData:
                         self.possibleCards.remove(clause)
                     elif (card in self.notHasCards):
                         # Remove this card from the clause
+                        #print "TODO removing %s %s" % (clause, card)
+                        #raise 'uhoh'
                         clause.remove(card)
                         if (len(clause) == 1):
                             # We have this card!
+                            #print 'TODO - deduced that player with cards %s has card %s' % (self.hasCards, list(clause)[0])
                             self.hasCards.add(list(clause)[0])
                             self.possibleCards.remove(clause)
                             changedCards.add(list(clause)[0])
@@ -152,6 +155,7 @@ class PlayerData:
                 for cardType in self.clueEngine.cards:
                     for card in self.clueEngine.cards[cardType]:
                         if (card not in self.hasCards and card not in self.notHasCards):
+                            #print 'TODO - known all cards, so not %s' % card
                             changedCards.update(self.infoOnCard(card, False))
             elif (len(self.hasCards) + len(self.possibleCards) > self.numCards):
                 # We may be able to figure out something.
@@ -171,6 +175,7 @@ class PlayerData:
                     if (not isPossible):
                         # We found a contradiction if we don't have this card,
                         # so we must have this card.
+                        #print 'TODO - deduced by contradiction that player with cards %s has card %s' % (self.hasCards, testCard)
                         changedCards.update(self.infoOnCard(testCard, True))
                         return changedCards
         return changedCards
@@ -411,7 +416,12 @@ class ClueEngine:
                             # If there are not enough cards available, we're
                             # inconsistent.
                             if (len(playerCardsAvailable) < numCardsNeeded):
-                                tempCardsAvailable = []
+                                #print 'inconsistent on player %d' % playerIdx
+                                #print 'curSoln: %s' % curSolution
+                                #print 'player.hasCards: %s' % tempEngine.players[playerIdx].hasCards
+                                #print 'player.notHasCards: %s' % tempEngine.players[playerIdx].notHasCards
+                                #print 'available: %d needed: %d' % (len(playerCardsAvailable), numCardsNeeded)
+                                tempCardsAvailable = set()
                             else:
                                 for i in range(numCardsNeeded):
                                     cardToAdd = random.choice(playerCardsAvailable)
@@ -423,9 +433,12 @@ class ClueEngine:
                                     #print "engine: %s" % repr(tempEngine)
                         # All players assigned.  Check consistency.
                         isConsistent = True
-                        for player in tempEngine.players:
+                        for (i, player) in enumerate(tempEngine.players):
                             if (len(player.hasCards.intersection(player.notHasCards)) > 0 or len(player.hasCards) != player.numCards):
-                                #print "hasNot: %d, hasCards: %d" % (len(player.hasCards.intersection(player.notHasCards)), len(player.hasCards))
+                                #if curSolution[0] == 'LeadPipe' and curSolution[1] == 'MissScarlet' and curSolution[2] == 'Library':
+                                    #print "hasNot: %d, hasCards: %d i: %d" % (len(player.hasCards.intersection(player.notHasCards)), len(player.hasCards), i)
+                                    #print 'hasCards: %s' % player.hasCards
+                                    #print 'notHasCards: %s' % player.notHasCards
                                 isConsistent = False
                         if (isConsistent):
                             # Update statistics
@@ -433,6 +446,7 @@ class ClueEngine:
                             for playerIdx in range(tempEngine.numPlayers + 1):
                                 for card in tempEngine.players[playerIdx].hasCards:
                                     simData[card][playerIdx] += 1
+        #print numSimulations
         return simData        
 
     @classmethod
@@ -446,12 +460,16 @@ class ClueEngine:
         changedCards = set()
         if (card != None):
             someoneHasCard = False
+            skipDeduction = False
             numWhoDontHaveCard = 0
             playerWhoMightHaveCard = -1
             # - Check also for all cards except one in a category are
             # accounted for.
             for i in range(self.numPlayers + 1):
                 player = self.players[i]
+                #if (card == 'Library'):
+                    #raise 'huh'
+                    #print "TODO - player %d hC: %s nHC: %s" % (i, player.hasCards, player.notHasCards)
                 if (card in player.hasCards):
                     # Someone has the card, so the solution is not this
                     someoneHasCard = True
@@ -463,10 +481,12 @@ class ClueEngine:
                     if (playerWhoMightHaveCard == -1):
                         playerWhoMightHaveCard = i
                     else:
-                        # The solution is not this.  Exit the loop.
-                        i = self.numPlayers + 2
-            if ((not someoneHasCard) and (numWhoDontHaveCard == self.numPlayers)):
+                        # The solution is not this, but someone later could
+                        # still have it.
+                        skipDeduction = True
+            if ((not skipDeduction) and (not someoneHasCard) and (numWhoDontHaveCard == self.numPlayers)):
                 # Every player except one doesn't have this card, so we know the player has it.
+                #print 'TODO - deduced that %d has card %s' % (playerWhoMightHaveCard, card)
                 changedCards.update(self.players[playerWhoMightHaveCard].infoOnCard(card, True, updateClueEngine=False))
             elif (someoneHasCard):
                 # Someone has this card, so no one else does. (including solution)

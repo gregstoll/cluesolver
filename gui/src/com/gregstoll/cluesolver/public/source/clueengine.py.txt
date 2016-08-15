@@ -1,1 +1,1 @@
-/home/gregstoll/projects/cluesolver/clueengine.py
+../../../../../../../clueengine.py
