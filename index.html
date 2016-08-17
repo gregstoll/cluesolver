@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Clue Solver</title>
+
+        <!-- The core React library -->
+        <script src="https://npmcdn.com/react@15.3.0/dist/react-with-addons.js"></script>
+        <!-- The ReactDOM Library -->
+        <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.js"></script>
+        <script src="https://npmcdn.com/babel-core@5.8.38/browser.js"></script>
+        <script src="react-tabs.min.js"></script>
+    </head>
+    <body>
+        <div id="reactTarget"></div>
+        <script type="text/babel">
+          var MIN_PLAYERS = 3;
+          var MAX_PLAYERS = 6;
+          var MIN_CARDS = 3;
+          var MAX_CARDS = 6;
+          var DEFAULT_CARDS = 3;
+          var NumberOfPlayerOption = React.createClass({
+              handleChange: function() {
+                  this.props.setNumberOfPlayers(this.props.thisNumberOfPlayers);
+              },
+              render: function() {
+                  return <span><input type="radio" name="numberOfPlayer" value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange}/> {this.props.thisNumberOfPlayers}</span>;
+              }
+          });
+          var NumberOfPlayers = React.createClass({
+              render: function() {
+                  var options = [];
+                  for (var i = MIN_PLAYERS; i <= MAX_PLAYERS; ++i) {
+                      options.push(<NumberOfPlayerOption thisNumberOfPlayers={i} numberOfPlayers={this.props.playerInfo.length} key={i} setNumberOfPlayers={this.props.setNumberOfPlayers}/>);
+                  }
+                  return <div><p>Number of players:</p><form>{options}</form></div>;
+              }
+          });
+          var PlayerNumberOfCards = React.createClass({
+              handleChange: function(e) {
+                  this.props.setNumberOfCards(e.target.value);
+              },
+              render: function() {
+                  var options = [];
+                  for (var i = MIN_CARDS; i <= MAX_CARDS; i++) {
+                      options.push(<option value={i} key={i}>{i}</option>);
+                  }
+                  return <select onChange={this.handleChange} value={this.props.num}>{options}</select>;
+              },
+          });
+          var PlayerInfo = React.createClass({
+              setNumberOfCards: function(numberOfCards) {
+                  this.props.setNumberOfCards(this.props.index, numberOfCards);
+              },
+              render: function() {
+                  return <div>Name:<input type="text" value={this.props.info[0]}/> Number of cards:<PlayerNumberOfCards num={this.props.info[1]} setNumberOfCards={this.props.setNumberOfCards}/></div>;
+              },
+          });
+          var PlayerList = React.createClass({
+              render: function() {
+                  var infos = [];
+                  for (var i = 0; i < this.props.playerInfo.length; ++i) {
+                      infos.push(<PlayerInfo index={i} key={i} info={this.props.playerInfo[i]} setNumberOfCards={this.props.setNumberOfCards}/>);
+                  }
+                  return <div>{infos}</div>;
+              },
+          });
+          var GameSetup = React.createClass({
+              render: function() {
+                  return <div><NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/><PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards}/></div>;
+              }
+          });
+          var GameInfo = React.createClass({
+              render: function() {
+                  return <th>Game info</th>;
+              }
+          });
+          var App = React.createClass({
+              getInitialState: function() {
+                  // TODO - parse query hash from window.location.hash
+                  var playerInfo = [];
+                  for (var i = 1; i <= 6; ++i)
+                  {
+                      playerInfo.push(['Player ' + i, DEFAULT_CARDS]);
+                  }
+                  return {'playerInfo': playerInfo};
+              },
+              setNumberOfPlayers: function(numberOfPlayers) {
+                  this.setState(function(previousState, currentProps) {
+                      var playerInfo = previousState.playerInfo.slice(0, previousState.playerInfo.length);
+                      if (playerInfo.length > numberOfPlayers) {
+                          return {'playerInfo': playerInfo.slice(0, numberOfPlayers)};
+                      }
+                      while (playerInfo.length < numberOfPlayers) {
+                          playerInfo.push(['Player ' + (playerInfo.length + 1), DEFAULT_CARDS]);
+                      }
+                      return {'playerInfo': playerInfo};
+                  });
+              },
+              setNumberOfCards: function(playerIndex, numberOfCards) {
+                  this.setState(function(previousState, currentProps) {
+                      var playerInfo = previousState.playerInfo.slice(0, previousState.playerInfo.length);
+                      playerInfo[playerIndex][1] = numberOfCards;
+                      return {'playerInfo': playerInfo};
+                  });
+              },
+              render: function() {
+                  return <ReactTabs.Tabs>
+                <ReactTabs.TabList>
+                    <ReactTabs.Tab>Game setup</ReactTabs.Tab>
+                    <ReactTabs.Tab>Game info</ReactTabs.Tab>
+                </ReactTabs.TabList>
+                <ReactTabs.TabPanel>
+                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards}/>
+                </ReactTabs.TabPanel>
+                <ReactTabs.TabPanel>
+                    <GameInfo playerInfo={this.state.playerInfo}/>
+                </ReactTabs.TabPanel>
+            </ReactTabs.Tabs>
+              }
+          });
+          ReactDOM.render(<App/>, document.getElementById('reactTarget'));
+        </script>
+    </body>
+</html>
