@@ -19,12 +19,20 @@
           var MIN_CARDS = 3;
           var MAX_CARDS = 6;
           var DEFAULT_CARDS = 3;
+          var INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"],
+                                ["Knife", "Candlestick", "Revolver", "LeadPipe", "Rope", "Wrench"],
+                                ["Hall", "Conservatory", "DiningRoom", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "BilliardRoom"]];
+          var EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Ms. White", "Mrs. Peacock"],
+                                ["Knife", "Candlestick", "Revolver", "Lead Pipe", "Rope", "Wrench"],
+                                ["Hall", "Conservatory", "Dining Room", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "Billiard Room"]];
+
           var NumberOfPlayerOption = React.createClass({
               handleChange: function() {
                   this.props.setNumberOfPlayers(this.props.thisNumberOfPlayers);
               },
               render: function() {
-                  return <span><input type="radio" name="numberOfPlayer" value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange}/> {this.props.thisNumberOfPlayers}</span>;
+                  var id = "numberOfPlayersInput" + this.props.thisNumberOfPlayers;
+                  return <span><input type="radio" name="numberOfPlayer" id={id} value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange}/><label htmlFor={id}> {this.props.thisNumberOfPlayers}</label></span>;
               }
           });
           var NumberOfPlayers = React.createClass({
@@ -50,24 +58,40 @@
           });
           var PlayerInfo = React.createClass({
               setNumberOfCards: function(numberOfCards) {
-                  this.props.setNumberOfCards(this.props.index, numberOfCards);
+                  this.props.setNumberOfCards(this.props.index, parseInt(numberOfCards));
+              },
+              setPlayerName: function(e) {
+                  this.props.setPlayerName(this.props.index, e.target.value);
               },
               render: function() {
-                  return <div>Name:<input type="text" value={this.props.info[0]}/> Number of cards:<PlayerNumberOfCards num={this.props.info[1]} setNumberOfCards={this.props.setNumberOfCards}/></div>;
+                  return <div>Name:<input type="text" value={this.props.info[0]} onChange={this.setPlayerName}/> Number of cards:<PlayerNumberOfCards num={this.props.info[1]} setNumberOfCards={this.setNumberOfCards}/></div>;
               },
           });
           var PlayerList = React.createClass({
               render: function() {
                   var infos = [];
                   for (var i = 0; i < this.props.playerInfo.length; ++i) {
-                      infos.push(<PlayerInfo index={i} key={i} info={this.props.playerInfo[i]} setNumberOfCards={this.props.setNumberOfCards}/>);
+                      infos.push(<PlayerInfo index={i} key={i} info={this.props.playerInfo[i]} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName} />);
                   }
                   return <div>{infos}</div>;
               },
           });
+          var NumberOfCardsValidator = React.createClass({
+              render: function() {
+                  var totalNumberOfCards = this.props.playerInfo.reduce(function(previousValue, currentValue) {
+                      return previousValue + currentValue[1];
+                  }, 0);
+                  var badNumberOfCardsElem = null;
+                  if (totalNumberOfCards != 18) {
+                      badNumberOfCardsElem = <span style={{'color': 'red'}}>Total number of cards must total 18! (not {totalNumberOfCards})</span>;
+                  }
+                  return <div>{badNumberOfCardsElem}</div>;
+              }
+          });
           var GameSetup = React.createClass({
               render: function() {
-                  return <div><NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/><PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards}/></div>;
+                  // TODO - show game state/load
+                  return <div><NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/><PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName}/><NumberOfCardsValidator playerInfo={this.props.playerInfo} /></div>;
               }
           });
           var GameInfo = React.createClass({
@@ -77,9 +101,9 @@
           });
           var App = React.createClass({
               getInitialState: function() {
-                  // TODO - parse query hash from window.location.hash
+                  // TODO - parse query hash from window.location.hash?
                   var playerInfo = [];
-                  for (var i = 1; i <= 6; ++i)
+                  for (var i = 1; i <= MAX_PLAYERS; ++i)
                   {
                       playerInfo.push(['Player ' + i, DEFAULT_CARDS]);
                   }
@@ -97,6 +121,13 @@
                       return {'playerInfo': playerInfo};
                   });
               },
+              setPlayerName: function(playerIndex, playerName) {
+                  this.setState(function(previousState, currentProps) {
+                      var playerInfo = previousState.playerInfo.slice(0, previousState.playerInfo.length);
+                      playerInfo[playerIndex][0] = playerName;
+                      return {'playerInfo': playerInfo};
+                  });
+              },
               setNumberOfCards: function(playerIndex, numberOfCards) {
                   this.setState(function(previousState, currentProps) {
                       var playerInfo = previousState.playerInfo.slice(0, previousState.playerInfo.length);
@@ -111,7 +142,7 @@
                     <ReactTabs.Tab>Game info</ReactTabs.Tab>
                 </ReactTabs.TabList>
                 <ReactTabs.TabPanel>
-                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards}/>
+                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
                     <GameInfo playerInfo={this.state.playerInfo}/>
