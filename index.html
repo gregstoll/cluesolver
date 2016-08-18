@@ -2,6 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Clue Solver</title>
 
         <!-- The core React library -->
@@ -19,12 +20,22 @@
           var MIN_CARDS = 3;
           var MAX_CARDS = 6;
           var DEFAULT_CARDS = 3;
-          var INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"],
+          var _INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"],
                                 ["Knife", "Candlestick", "Revolver", "LeadPipe", "Rope", "Wrench"],
                                 ["Hall", "Conservatory", "DiningRoom", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "BilliardRoom"]];
-          var EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Ms. White", "Mrs. Peacock"],
+          var _EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Ms. White", "Mrs. Peacock"],
                                 ["Knife", "Candlestick", "Revolver", "Lead Pipe", "Rope", "Wrench"],
                                 ["Hall", "Conservatory", "Dining Room", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "Billiard Room"]];
+          var CARD_TYPE_NAMES = ["Suspects", "Weapons", "Rooms"];
+          var CARD_NAMES = [];
+          for (var i = 0; i < _INTERNAL_NAMES.length; ++i) {
+              CARD_NAMES.push([]);
+              for (var j = 0; j < _INTERNAL_NAMES[i].length; ++j) {
+                  CARD_NAMES[i].push({'card_type': i, 'index': j, 'internal': _INTERNAL_NAMES[i][j], 'external': _EXTERNAL_NAMES[i][j]});
+              }
+          }
+          var CARD_STATES = Object.freeze({Unknown: 0, OwnedByPlayer: 1, OwnedByCasefile: 2});
+
 
           var NumberOfPlayerOption = React.createClass({
               handleChange: function() {
@@ -94,9 +105,75 @@
                   return <div><NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/><PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName}/><NumberOfCardsValidator playerInfo={this.props.playerInfo} /></div>;
               }
           });
+          var SpecificCardInfo = React.createClass({
+              getImgSrc: function() {
+                  var name;
+                  switch (this.props.state) {
+                      case CARD_STATES.OwnedByPlayer:
+                        name = 'cancel.png';
+                        break;
+                      case CARD_STATES.OwnedByCasefile:
+                        name = 'accept.png';
+                        break;
+                      case CARD_STATES.Unknown:
+                      default:
+                        name = 'help.png';
+                        break;
+                  }
+                  return 'images/' + name;
+              },
+              render: function() {
+                  return <tr><td style={{paddingLeft: 20, textAlign: 'left'}}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td><td><img src={this.getImgSrc()}/></td></tr>;
+              }
+          });
+          /*var CardTypeInfo = React.createClass({
+              render: function() {
+                  var rows = [];
+                  for (var i = 0; i < this.props.cardInfos.length; ++i) {
+                      rows.push(<SpecificCardInfo key={i} info={this.props.cardInfos[i]} />);
+                  }
+                  return <tr style={{paddingLeft: 10}}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[this.props.cardInfos[0].card_type]}</th><th></th></tr>; //{rows};
+              }
+          });*/
+          var CardSelector = React.createClass({
+              getInitialState: function() {
+                  return {cardIndex: [0, 0]};
+              },
+              render: function() {
+                  var options = [];
+                  for (var i = 0; i < CARD_NAMES.length; ++i) {
+                      for (var j = 0; j < CARD_NAMES[i].length; ++j) {
+                          options.push(<option value={i + ' ' + j} key={i + ' ' + j}>{CARD_NAMES[i][j].external}</option>);
+                      }
+                  }
+                  // TODO - finish
+                  return <span>Card: <select>{options}</select></span>;
+              }
+          });
           var GameInfo = React.createClass({
               render: function() {
-                  return <th>Game info</th>;
+                  var infoRows = [];
+                  for (var i = 0; i < this.props.cardInfo.length; ++i) {
+                      infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[this.props.cardInfo[i][0].card_type]}</th><th></th></tr>);
+                      for (var j = 0; j < this.props.cardInfo[i].length; ++j) {
+                          infoRows.push(<SpecificCardInfo key={i + ' ' + j} info={this.props.cardInfo[i][j]} />);
+                      }
+                  }
+                  return <div><table style={{cssFloat: 'left'}}><tbody>{infoRows}</tbody></table><div style={{cssFloat: 'left'}}>Enter new info:
+                    <ReactTabs.Tabs>
+                        <ReactTabs.TabList>
+                            <ReactTabs.Tab>Who owns a card</ReactTabs.Tab>
+                            <ReactTabs.Tab>Suggestion made</ReactTabs.Tab>
+                        </ReactTabs.TabList>
+                        <ReactTabs.TabPanel>
+                            <CardSelector/>
+                        </ReactTabs.TabPanel>
+                        <ReactTabs.TabPanel>
+                            Suggest!
+                        </ReactTabs.TabPanel>
+                    </ReactTabs.Tabs>
+                  </div>
+                  <div style={{clear: 'both'}}/></div>;
               }
           });
           var App = React.createClass({
@@ -107,7 +184,15 @@
                   {
                       playerInfo.push(['Player ' + i, DEFAULT_CARDS]);
                   }
-                  return {'playerInfo': playerInfo};
+                  var cardInfo = [];
+                  for (var i = 0; i < CARD_NAMES.length; ++i) {
+                      cardInfo.push([]);
+                      for (var j = 0; j < CARD_NAMES[i].length; ++j) {
+                          cardInfo[i].push({'card_type': i, 'index': j, 'state': CARD_STATES.Unknown, 'owners': []});
+                      }
+                  }
+
+                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo};
               },
               setNumberOfPlayers: function(numberOfPlayers) {
                   this.setState(function(previousState, currentProps) {
@@ -145,7 +230,7 @@
                     <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
-                    <GameInfo playerInfo={this.state.playerInfo}/>
+                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo}/>
                 </ReactTabs.TabPanel>
             </ReactTabs.Tabs>
               }
