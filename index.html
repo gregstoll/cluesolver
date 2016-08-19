@@ -150,6 +150,19 @@
                   return <span>Card: <select>{options}</select></span>;
               }
           });
+          var PlayerSelector = React.createClass({
+              getInitialState: function() {
+                  return {playerIndex: 0};
+              },
+              // TODO - finish
+              render: function() {
+                  var options = [];
+                  for (var i = 0; i < this.props.playerInfo.length; ++i) {
+                      options.push(<option value={i} key={i}>{this.props.playerInfo[i][0]}</option>);
+                  }
+                  return <span>{this.props.label}: <select>{options}</select></span>
+              }
+          });
           var GameInfo = React.createClass({
               render: function() {
                   var infoRows = [];
@@ -166,7 +179,8 @@
                             <ReactTabs.Tab>Suggestion made</ReactTabs.Tab>
                         </ReactTabs.TabList>
                         <ReactTabs.TabPanel>
-                            <CardSelector/>
+                            <div><CardSelector/></div>
+                            <div><PlayerSelector playerInfo={this.props.playerInfo} label="Owned by"/></div>
                         </ReactTabs.TabPanel>
                         <ReactTabs.TabPanel>
                             Suggest!
