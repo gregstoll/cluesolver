@@ -10,6 +10,7 @@
         <!-- The ReactDOM Library -->
         <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.js"></script>
         <script src="https://npmcdn.com/babel-core@5.8.38/browser.js"></script>
+        <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.1.0.min.js"></script>
         <script src="react-tabs.min.js"></script>
     </head>
     <body>
@@ -136,8 +137,8 @@
               }
           });*/
           var CardSelector = React.createClass({
-              getInitialState: function() {
-                  return {cardIndex: [0, 0]};
+              handleChange: function(e) {
+                  this.props.setCardIndex(e.target.value.split(" ").map(function(x) { return parseInt(x, 10); }));
               },
               render: function() {
                   var options = [];
@@ -146,21 +147,37 @@
                           options.push(<option value={i + ' ' + j} key={i + ' ' + j}>{CARD_NAMES[i][j].external}</option>);
                       }
                   }
-                  // TODO - finish
-                  return <span>Card: <select>{options}</select></span>;
+                  return <span>Card: <select value={this.props.cardIndex.join(' ')} onChange={this.handleChange}>{options}</select></span>;
               }
           });
           var PlayerSelector = React.createClass({
-              getInitialState: function() {
-                  return {playerIndex: 0};
+              handleChange: function(e) {
+                  this.props.setPlayerIndex(parseInt(e.target.value));
               },
-              // TODO - finish
               render: function() {
                   var options = [];
                   for (var i = 0; i < this.props.playerInfo.length; ++i) {
                       options.push(<option value={i} key={i}>{this.props.playerInfo[i][0]}</option>);
                   }
-                  return <span>{this.props.label}: <select>{options}</select></span>
+                  return <span>{this.props.label}: <select value={this.props.playerIndex} onChange={this.handleChange}>{options}</select></span>
+              }
+          });
+          var WhoOwnsACard = React.createClass({
+              getInitialState: function() {
+                  return {cardIndex: [0, 0], playerIndex: 0};
+              },
+              setCardIndex: function(newCardIndex) {
+                  this.setState({cardIndex: newCardIndex});
+              },
+              setPlayerIndex: function(newPlayerIndex) {
+                  this.setState({playerIndex: newPlayerIndex});
+              },
+              // TODO - add button, ajax request
+              render: function() {
+                  return <div>
+                      <div><CardSelector cardIndex={this.state.cardIndex} setCardIndex={this.setCardIndex}/></div>
+                      <div><PlayerSelector label="Owned by" playerInfo={this.props.playerInfo} playerIndex={this.state.playerIndex} setPlayerIndex={this.setPlayerIndex}/></div>
+                  </div>;
               }
           });
           var GameInfo = React.createClass({
@@ -179,8 +196,7 @@
                             <ReactTabs.Tab>Suggestion made</ReactTabs.Tab>
                         </ReactTabs.TabList>
                         <ReactTabs.TabPanel>
-                            <div><CardSelector/></div>
-                            <div><PlayerSelector playerInfo={this.props.playerInfo} label="Owned by"/></div>
+                            <WhoOwnsACard playerInfo={this.props.playerInfo}/>
                         </ReactTabs.TabPanel>
                         <ReactTabs.TabPanel>
                             Suggest!
