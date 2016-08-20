@@ -4,14 +4,14 @@ import xml.etree.ElementTree as ET
 import cgi, sys, json
 import clueengine
 
-def error(str):
+def error(s):
     print "Content-type: application/json\n\n"
-    print '{"errorStatus": 1, "errorText": "%s"}' % str
+    print '{"errorStatus": 1, "errorText": "%s"}' % s
     sys.exit(0)
 
-def success(str):
+def success(s):
     print "Content-type: application/json\n\n"
-    print '{"errorStatus": 0, %s}' % str
+    print '{"errorStatus": 0, %s}' % s
     sys.exit(0)
 
 def getClauseInfo(engine):
@@ -54,8 +54,8 @@ if (action != 'new' and action != 'whoOwns' and action != 'suggestion' and actio
 if (action != 'new' and (not form.has_key('sess'))):
     error("Internal error - missing sess!")
 if (action != 'new'):
-    (engine, str) = clueengine.ClueEngine.loadFromString(form.getfirst('sess'))
-    if (str != ''):
+    (engine, s) = clueengine.ClueEngine.loadFromString(form.getfirst('sess'))
+    if (s != ''):
         error("Internal error - invalid session string '%s'!" % form.getfirst('sess'))
 else:
     if (not form.has_key('players')):

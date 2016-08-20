@@ -240,72 +240,72 @@ class ClueEngine:
         return ''
 
     @classmethod
-    def loadFromString(cls, str):
-        numPlayers = int(str[0])
-        str = str[1:]
+    def loadFromString(cls, s):
+        numPlayers = int(s[0])
+        s = s[1:]
         ce = ClueEngine(numPlayers)
         for i in range(numPlayers+1):
-            str = cls.loadPlayerFromString(str, i, ce)
-        return (ce, str)
+            s = cls.loadPlayerFromString(s, i, ce)
+        return (ce, s)
 
     def writeToString(self):
-        str = ''
-        str += '%d' % self.numPlayers
+        s = ''
+        s += '%d' % self.numPlayers
         for i in range(self.numPlayers+1):
-            str += self.writePlayerToString(i)
-        return str
+            s += self.writePlayerToString(i)
+        return s
 
     @classmethod
-    def loadPlayerFromString(cls, str, idx, ce):
-        numCards = int(str[0])
+    def loadPlayerFromString(cls, s, idx, ce):
+        numCards = int(s[0])
         if (numCards == 0):
             numCards = -1
         ce.players[idx].numCards = numCards
-        str = str[1:]
+        s = s[1:]
         # Load the list of cards this player has
-        while (str[0] != '-'):
-            ce.infoOnCard(idx, cls.cardFromChar(str[0]), True)
-            str = str[1:]
-        str = str[1:]
+        while (s[0] != '-'):
+            ce.infoOnCard(idx, cls.cardFromChar(s[0]), True)
+            s = s[1:]
+        s = s[1:]
         # Load the list of cards this player doesn't have
-        while (str[0] != '-' and str[0] != '.'):
-            ce.infoOnCard(idx, cls.cardFromChar(str[0]), False)
-            str = str[1:]
+        while (s[0] != '-' and s[0] != '.'):
+            ce.infoOnCard(idx, cls.cardFromChar(s[0]), False)
+            s = s[1:]
         # Load the list of clauses as long as it's not done
-        while str[0] != '.':
-            str = str[1:]
+        while s[0] != '.':
+            s = s[1:]
             clause = []
-            while str[0] != '-' and str[0] != '.':
-                clause.append(cls.cardFromChar(str[0]))
-                str = str[1:]
+            while s[0] != '-' and s[0] != '.':
+                clause.append(cls.cardFromChar(s[0]))
+                s = s[1:]
             if (len(clause) > 0):
                 ce.players[idx].hasOneOfCards(clause)
-        str = str[1:]
-        return str
+        s = s[1:]
+        return s
 
     def writePlayerToString(self, idx):
         numCardsToWrite = self.players[idx].numCards
         # Always write one digit for simplicity
         if (numCardsToWrite == -1):
             numCardsToWrite = 0
-        str = '%d' % numCardsToWrite
+        s = '%d' % numCardsToWrite
         for card in self.players[idx].hasCards:
-            str += ClueEngine.charFromCard(card)
-        str += '-'
+            s += ClueEngine.charFromCard(card)
+        s += '-'
         for card in self.players[idx].notHasCards:
-            str += ClueEngine.charFromCard(card)
+            s += ClueEngine.charFromCard(card)
         if (len(self.players[idx].possibleCards) == 0):
-            str += '.'
-            return str
-        str += '-'
+            s += '.'
+            return s
+        s += '-'
         for possibleCardGroup in self.players[idx].possibleCards:
             for card in possibleCardGroup:
-                str += ClueEngine.charFromCard(card)
-            str += '-'
+                s += ClueEngine.charFromCard(card)
+            s += '-'
         # But we want a . at the end, not -
-        str = str[:-1]
-        str += '.'
-        return str
+        s = s[:-1]
+        s += '.'
+        return s
 
     def isConsistent(self):
         isConsistent = True
@@ -745,10 +745,10 @@ class TestCaseClueEngine(unittest.TestCase):
 
 
     def testLoadFromString(self):
-        (ce, str) = ClueEngine.loadFromString('29AH-BCD-KL-MN.9-AH.3-.')
-        self.assertEqual(str, '')
-        (ce, str) = ClueEngine.loadFromString('29A-.9-.3-.')
-        self.assertEqual(str, '')
+        (ce, s) = ClueEngine.loadFromString('29AH-BCD-KL-MN.9-AH.3-.')
+        self.assertEqual(s, '')
+        (ce, s) = ClueEngine.loadFromString('29A-.9-.3-.')
+        self.assertEqual(s, '')
         self.assertEqual(len(ce.players[0].hasCards), 1)
         self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
         self.assertEqual(len(ce.players[0].notHasCards), 0)
@@ -758,15 +758,15 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(len(ce.players[2].hasCards), 0)
         self.assertEqual(len(ce.players[2].notHasCards), 1)
         self.assertEqual(ce.playerHasCard(2, 'ProfessorPlum'), False)
-        (ce, str) = ClueEngine.loadFromString('29A-B.9L-C.3U-.')
-        self.assertEqual(str, '')
+        (ce, s) = ClueEngine.loadFromString('29A-B.9L-C.3U-.')
+        self.assertEqual(s, '')
         self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
         self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), False)
         self.assert_(ce.playerHasCard(1, 'Wrench'))
         self.assertEqual(ce.playerHasCard(1, 'MrGreen'), False)
         self.assert_(ce.playerHasCard(2, 'BilliardRoom'))
-        (ce, str) = ClueEngine.loadFromString('29-.9A-B-CDE-FGH.3U-.')
-        self.assertEqual(str, '')
+        (ce, s) = ClueEngine.loadFromString('29-.9A-B-CDE-FGH.3U-.')
+        self.assertEqual(s, '')
         self.assert_(ce.playerHasCard(1, 'ProfessorPlum'))
         self.assertEqual(ce.playerHasCard(1, 'ColonelMustard'), False)
         self.assertEqual(len(ce.players[1].possibleCards), 2)
@@ -774,10 +774,10 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ce.players[1].possibleCards[1], set([ClueEngine.cardFromChar('F'), ClueEngine.cardFromChar('G'), ClueEngine.cardFromChar('H')]))
        
     def testWriteToString(self):
-        str = '29AH-BCD-KL-NM.9-AH.3-AH.'
-        self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
-        str = '29-AU.9A-BU-ECD-FH.3U-ANSQRTOMP.'
-        self.assertEqual(str, ClueEngine.loadFromString(str)[0].writeToString())
+        s = '29AH-BCD-KL-NM.9-AH.3-AH.'
+        self.assertEqual(s, ClueEngine.loadFromString(s)[0].writeToString())
+        s = '29-AU.9A-BU-ECD-FH.3U-ANSQRTOMP.'
+        self.assertEqual(s, ClueEngine.loadFromString(s)[0].writeToString())
 
 def main():
     ce = ClueEngine()

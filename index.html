@@ -10,12 +10,13 @@
         <!-- The ReactDOM Library -->
         <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.js"></script>
         <script src="https://npmcdn.com/babel-core@5.8.38/browser.js"></script>
-        <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.1.0.min.js"></script>
+        <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.1.0.min.js"></script>
         <script src="react-tabs.min.js"></script>
     </head>
     <body>
         <div id="reactTarget"></div>
         <script type="text/babel">
+          var SCRIPT_NAME = "clue.cgi";
           var MIN_PLAYERS = 3;
           var MAX_PLAYERS = 6;
           var MIN_CARDS = 3;
@@ -37,6 +38,19 @@
           }
           var CARD_STATES = Object.freeze({Unknown: 0, OwnedByPlayer: 1, OwnedByCasefile: 2});
 
+          function sendClueRequest(data, successCallback, failureCallback) {
+              $.ajax({url: SCRIPT_NAME, data: data, dataType: "json", complete: function(xhr, textStatus) {
+                  if (textStatus != "success" && textStatus != "notmodified") {
+                      failureCallback(textStatus);
+                      return;
+                  }
+                  if (xhr.responseJSON.errorStatus != 0) {
+                      failureCallback(xhr.responseJSON.errorText);
+                      return;
+                  }
+                  successCallback(xhr.responseJSON);
+              }});
+          }
 
           var NumberOfPlayerOption = React.createClass({
               handleChange: function() {
@@ -101,15 +115,31 @@
               }
           });
           var GameSetup = React.createClass({
+              getInitialState: function() {
+                  return {loadGameString: ""};
+              },
+              handleLoadGameStringChange: function(e) {
+                  this.setState({loadGameString: e.target.value});
+              },
+              handleSetLoadGameString: function() {
+                  this.props.setGameString(this.state.loadGameString);
+              },
               render: function() {
                   // TODO - show game state/load
-                  return <div><NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/><PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName}/><NumberOfCardsValidator playerInfo={this.props.playerInfo} /></div>;
+                  return <div>
+                    <NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/>
+                    <PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName}/>
+                    <NumberOfCardsValidator playerInfo={this.props.playerInfo} />
+                    <div>Current game state (for loading later): {this.props.session}</div>
+                    <div>Load game state: <input type="text" onChange={this.handleLoadGameStringChange} value={this.state.loadGameString}/></div>
+                    <button type="button" onClick={this.handleSetLoadGameString}>Load game</button>
+                  </div>;
               }
           });
           var SpecificCardInfo = React.createClass({
               getImgSrc: function() {
                   var name;
-                  switch (this.props.state) {
+                  switch (this.props.info.state) {
                       case CARD_STATES.OwnedByPlayer:
                         name = 'cancel.png';
                         break;
@@ -123,19 +153,47 @@
                   }
                   return 'images/' + name;
               },
+              getOwnedByString: function() {
+                  if (this.props.info.owners && !(this.props.info.owners.length  > 0)) {
+                      return "???";
+                  }
+                  var s = "";
+                  for (var i = 0; i < this.props.info.owners.length; ++i) {
+                      var curIndex = this.props.info.owners[i];
+                      if (curIndex == this.props.playerInfo.length) {
+                          s += "(solution)";
+                      }
+                      else {
+                          s += this.props.playerInfo[curIndex][0];
+                      }
+                      if (i < this.props.info.owners.length - 1) {
+                          s += " or ";
+                      }
+                  }
+                  return s;
+              },
+              getAltText: function() {
+                  switch (this.props.info.state) {
+                      case CARD_STATES.OwnedByPlayer:
+                        return "Owned by " + this.getOwnedByString();
+                        break;
+                      case CARD_STATES.OwnedByCasefile:
+                        return "Solution!";
+                        break;
+                      case CARD_STATES.Unknown:
+                      default:
+                        if (this.props.info.owners && this.props.info.owners.length > 0) {
+                            return "Owned by " + this.getOwnedByString();
+                        } else {
+                            return "Unknown";
+                        }
+                        break;
+                  }
+              },
               render: function() {
-                  return <tr><td style={{paddingLeft: 20, textAlign: 'left'}}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td><td><img src={this.getImgSrc()}/></td></tr>;
+                  return <tr><td style={{paddingLeft: 20, textAlign: 'left'}}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td><td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()}/></td></tr>;
               }
           });
-          /*var CardTypeInfo = React.createClass({
-              render: function() {
-                  var rows = [];
-                  for (var i = 0; i < this.props.cardInfos.length; ++i) {
-                      rows.push(<SpecificCardInfo key={i} info={this.props.cardInfos[i]} />);
-                  }
-                  return <tr style={{paddingLeft: 10}}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[this.props.cardInfos[0].card_type]}</th><th></th></tr>; //{rows};
-              }
-          });*/
           var CardSelector = React.createClass({
               handleChange: function(e) {
                   this.props.setCardIndex(e.target.value.split(" ").map(function(x) { return parseInt(x, 10); }));
@@ -186,7 +244,7 @@
                   for (var i = 0; i < this.props.cardInfo.length; ++i) {
                       infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[this.props.cardInfo[i][0].card_type]}</th><th></th></tr>);
                       for (var j = 0; j < this.props.cardInfo[i].length; ++j) {
-                          infoRows.push(<SpecificCardInfo key={i + ' ' + j} info={this.props.cardInfo[i][j]} />);
+                          infoRows.push(<SpecificCardInfo key={i + ' ' + j} info={this.props.cardInfo[i][j]} playerInfo={this.props.playerInfo}/>);
                       }
                   }
                   return <div><table style={{cssFloat: 'left'}}><tbody>{infoRows}</tbody></table><div style={{cssFloat: 'left'}}>Enter new info:
@@ -224,16 +282,19 @@
 
                   return {'playerInfo': playerInfo, 'cardInfo': cardInfo};
               },
+              internalSetNumberOfPlayers: function(previousPlayerInfo, numberOfPlayers) {
+                  var playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
+                  if (playerInfo.length > numberOfPlayers) {
+                      return playerInfo.slice(0, numberOfPlayers);
+                  }
+                  while (playerInfo.length < numberOfPlayers) {
+                      playerInfo.push(['Player ' + (playerInfo.length + 1), DEFAULT_CARDS]);
+                  }
+                  return playerInfo;
+              },
               setNumberOfPlayers: function(numberOfPlayers) {
                   this.setState(function(previousState, currentProps) {
-                      var playerInfo = previousState.playerInfo.slice(0, previousState.playerInfo.length);
-                      if (playerInfo.length > numberOfPlayers) {
-                          return {'playerInfo': playerInfo.slice(0, numberOfPlayers)};
-                      }
-                      while (playerInfo.length < numberOfPlayers) {
-                          playerInfo.push(['Player ' + (playerInfo.length + 1), DEFAULT_CARDS]);
-                      }
-                      return {'playerInfo': playerInfo};
+                      return {'playerInfo': this.internalSetNumberOfPlayers(previousState.playerInfo, numberOfPlayers)};
                   });
               },
               setPlayerName: function(playerIndex, playerName) {
@@ -250,6 +311,73 @@
                       return {'playerInfo': playerInfo};
                   });
               },
+              newSession: function() {
+                  var data = "action=new&players=" + this.state.playerInfo.length;
+                  for (var i = 0; i < this.state.playerInfo.length; ++i) {
+                      data += "&numCards" + i + "=" + this.state.playerInfo[i][1];
+                  }
+                  var myApp = this;
+                  sendClueRequest(data, function(json) {
+                      myApp.setState({'session': json.session});
+                      myApp.updateCardInfo(json.session);
+                  }, function(errorText) {
+                      alert('Error: ' + errorText);
+                  });
+              },
+              cardIndexFromInternalName: function(name) {
+                  // TODO - optimize this
+                  for (var i = 0; i < CARD_NAMES.length; ++i) {
+                      for (var j = 0; j < CARD_NAMES[i].length; ++j) {
+                          if (CARD_NAMES[i][j].internal === name) {
+                              return [i, j];
+                          }
+                      }
+                  }
+                  return [-1, -1];
+              },
+              setGameString: function(s) {
+                  this.setState({session: s});
+                  this.updateCardInfo(s);
+              },
+              updateCardInfo: function(session) {
+                  var data = "sess=" + session + "&action=fullInfo";
+                  var myApp = this;
+                  sendClueRequest(data, function(json) {
+                      var playerInfo = myApp.internalSetNumberOfPlayers(myApp.state.playerInfo, json.numPlayers);
+                      for (var i = 0; i < json.numPlayers; ++i) {
+                          playerInfo[i][1] = json.numCards[i];
+                      }
+
+                      // TODO - lock number of players, etc. (if any info?)
+
+                      // TODO - something with clause info?
+                      // TODO - isConsistent
+                      var newInfo = json.newInfo;
+                      // TODO?
+                      //alert(myApp.state.cardInfo[0][0].owners);
+                      //var newCardInfo = $.extend(true, {}, myApp.state.cardInfo);
+                      var newCardInfo = [];
+                      for (var i = 0; i < CARD_NAMES.length; ++i) {
+                          newCardInfo.push([]);
+                          for (var j = 0; j < CARD_NAMES[i].length; ++j) {
+                              newCardInfo[i].push({'card_type': i, 'index': j, 'state': CARD_STATES.Unknown, 'owners': []});
+                          }
+                      }
+
+                      for (var i = 0; i < newInfo.length; ++i) {
+                          var cardIndex = myApp.cardIndexFromInternalName(newInfo[i].card);
+                          newCardInfo[cardIndex[0]][cardIndex[1]].state = newInfo[i].status;
+                          newCardInfo[cardIndex[0]][cardIndex[1]].owners = newInfo[i].owner;
+                      }
+                      //alert(newCardInfo[0][0].owners);
+                      myApp.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo});
+                  }, function(errorText) {
+                      alert('Error: ' + errorText);
+                  });
+              },
+              componentWillMount: function() {
+                  this.newSession();
+              },
               render: function() {
                   return <ReactTabs.Tabs>
                 <ReactTabs.TabList>
@@ -257,7 +385,7 @@
                     <ReactTabs.Tab>Game info</ReactTabs.Tab>
                 </ReactTabs.TabList>
                 <ReactTabs.TabPanel>
-                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName}/>
+                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName} session={this.state.session} setGameString={this.setGameString}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
                     <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo}/>
