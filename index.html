@@ -25,6 +25,7 @@
           var MIN_CARDS = 3;
           var MAX_CARDS = 6;
           var DEFAULT_CARDS = 3;
+          var TOTAL_CARDS_FOR_PLAYERS = 18;
           var _INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"],
                                 ["Knife", "Candlestick", "Revolver", "LeadPipe", "Rope", "Wrench"],
                                 ["Hall", "Conservatory", "DiningRoom", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "BilliardRoom"]];
@@ -62,14 +63,14 @@
               },
               render: function() {
                   var id = "numberOfPlayersInput" + this.props.thisNumberOfPlayers;
-                  return <span><input type="radio" name="numberOfPlayer" id={id} value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange}/><label htmlFor={id}> {this.props.thisNumberOfPlayers}</label></span>;
+                  return <span><input type="radio" name="numberOfPlayer" id={id} value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange} disabled={!this.props.allowChange}/><label htmlFor={id}> {this.props.thisNumberOfPlayers}</label></span>;
               }
           });
           var NumberOfPlayers = React.createClass({
               render: function() {
                   var options = [];
                   for (var i = MIN_PLAYERS; i <= MAX_PLAYERS; ++i) {
-                      options.push(<NumberOfPlayerOption thisNumberOfPlayers={i} numberOfPlayers={this.props.playerInfo.length} key={i} setNumberOfPlayers={this.props.setNumberOfPlayers}/>);
+                      options.push(<NumberOfPlayerOption thisNumberOfPlayers={i} numberOfPlayers={this.props.playerInfo.length} key={i} setNumberOfPlayers={this.props.setNumberOfPlayers} allowChange={this.props.allowChange}/>);
                   }
                   return <div><p>Number of players:</p><form>{options}</form></div>;
               }
@@ -83,7 +84,7 @@
                   for (var i = MIN_CARDS; i <= MAX_CARDS; i++) {
                       options.push(<option value={i} key={i}>{i}</option>);
                   }
-                  return <select onChange={this.handleChange} value={this.props.num}>{options}</select>;
+                  return <select onChange={this.handleChange} disabled={!this.props.allowChange} value={this.props.num}>{options}</select>;
               },
           });
           var PlayerInfo = React.createClass({
@@ -94,14 +95,14 @@
                   this.props.setPlayerName(this.props.index, e.target.value);
               },
               render: function() {
-                  return <div>Name:<input type="text" value={this.props.info[0]} onChange={this.setPlayerName}/> Number of cards:<PlayerNumberOfCards num={this.props.info[1]} setNumberOfCards={this.setNumberOfCards}/></div>;
+                  return <div>Name:<input type="text" value={this.props.info[0]} onChange={this.setPlayerName}/> Number of cards:<PlayerNumberOfCards num={this.props.info[1]} setNumberOfCards={this.setNumberOfCards} allowChange={this.props.allowChange}/></div>;
               },
           });
           var PlayerList = React.createClass({
               render: function() {
                   var infos = [];
                   for (var i = 0; i < this.props.playerInfo.length; ++i) {
-                      infos.push(<PlayerInfo index={i} key={i} info={this.props.playerInfo[i]} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName} />);
+                      infos.push(<PlayerInfo index={i} key={i} info={this.props.playerInfo[i]} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName} allowChange={this.props.allowChange}/>);
                   }
                   return <div>{infos}</div>;
               },
@@ -112,8 +113,8 @@
                       return previousValue + currentValue[1];
                   }, 0);
                   var badNumberOfCardsElem = null;
-                  if (totalNumberOfCards != 18) {
-                      badNumberOfCardsElem = <span style={{'color': 'red'}}>Total number of cards must total 18! (not {totalNumberOfCards})</span>;
+                  if (totalNumberOfCards != TOTAL_CARDS_FOR_PLAYERS) {
+                      badNumberOfCardsElem = <span style={{'color': 'red'}}>Total number of cards must total {TOTAL_CARDS_FOR_PLAYERS}! (not {totalNumberOfCards})</span>;
                   }
                   return <div>{badNumberOfCardsElem}</div>;
               }
@@ -121,6 +122,9 @@
           var GameSetup = React.createClass({
               getInitialState: function() {
                   return {loadGameString: ""};
+              },
+              handleRestartGame: function() {
+                  this.props.newSession();
               },
               handleLoadGameStringChange: function(e) {
                   this.setState({loadGameString: e.target.value});
@@ -130,9 +134,10 @@
               },
               render: function() {
                   return <div>
-                    <NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/>
-                    <PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName}/>
+                    <NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers} allowChange={!this.props.haveEnteredData}/>
+                    <PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName} allowChange={!this.props.haveEnteredData}/>
                     <NumberOfCardsValidator playerInfo={this.props.playerInfo} />
+                    <button type="button" onClick={this.handleRestartGame} disabled={!this.props.haveEnteredData}>Restart game</button>
                     <div>Current game state (for loading later): {this.props.session}</div>
                     <div>Load game state: <input type="text" onChange={this.handleLoadGameStringChange} value={this.state.loadGameString}/></div>
                     <button type="button" onClick={this.handleSetLoadGameString}>Load game</button>
@@ -268,7 +273,6 @@
                   this.setState({cardIndices: newCardIndices});
               },
               sendSuggestion: function() {
-                  // TODOTODO
                   var data = "sess=" + this.props.session + "&action=suggestion&suggestingPlayer=" + this.state.suggestingPlayerIndex;
                   for (var i = 0; i < CARD_TYPE_NAMES.length; ++i) {
                       data += "&card" + (i+1) + "=" + CARD_NAMES[i][this.state.cardIndices[i]].internal;
@@ -283,7 +287,7 @@
                   var that = this;
                   sendClueRequest(data, function(json) {
                       // TODO - add to history
-                      that.props.updateInfoFromJson(json);
+                      that.props.updateInfoFromJson(json, true);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
                   });
@@ -318,7 +322,7 @@
                   var that = this;
                   sendClueRequest(data, function(json) {
                       // TODO - add to history
-                      that.props.updateInfoFromJson(json);
+                      that.props.updateInfoFromJson(json, true);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
                   });
@@ -373,21 +377,39 @@
                       }
                   }
 
-                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true};
+                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false};
               },
               internalSetNumberOfPlayers: function(previousPlayerInfo, numberOfPlayers) {
                   var playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
-                  if (playerInfo.length > numberOfPlayers) {
-                      return playerInfo.slice(0, numberOfPlayers);
+                  if (playerInfo.length == numberOfPlayers) {
+                      return playerInfo;
                   }
-                  while (playerInfo.length < numberOfPlayers) {
-                      playerInfo.push(['Player ' + (playerInfo.length + 1), DEFAULT_CARDS]);
+                  if (playerInfo.length > numberOfPlayers) {
+                      playerInfo = playerInfo.slice(0, numberOfPlayers);
+                  }
+                  else {
+                      while (playerInfo.length < numberOfPlayers) {
+                          // use DEFAULT_CARDS here, will fix afterwards
+                          playerInfo.push(['Player ' + (playerInfo.length + 1), DEFAULT_CARDS]);
+                      }
+                  }
+                  var baseCards = Math.floor(TOTAL_CARDS_FOR_PLAYERS / numberOfPlayers);
+                  var numWhoGetExtra = (TOTAL_CARDS_FOR_PLAYERS - baseCards * numberOfPlayers) % numberOfPlayers;
+                  for (var i = 0; i < playerInfo.length; ++i) {
+                      var numCards = baseCards;
+                      if (i < numWhoGetExtra) {
+                          numCards++;
+                      }
+                      playerInfo[i][1] = numCards;
                   }
                   return playerInfo;
               },
               setNumberOfPlayers: function(numberOfPlayers) {
+                  var that = this;
                   this.setState(function(previousState, currentProps) {
                       return {'playerInfo': this.internalSetNumberOfPlayers(previousState.playerInfo, numberOfPlayers)};
+                  }, function(state, props) {
+                      that.newSession();
                   });
               },
               setPlayerName: function(playerIndex, playerName) {
@@ -398,10 +420,13 @@
                   });
               },
               setNumberOfCards: function(playerIndex, numberOfCards) {
+                  var that = this;
                   this.setState(function(previousState, currentProps) {
                       var playerInfo = previousState.playerInfo.slice(0, previousState.playerInfo.length);
                       playerInfo[playerIndex][1] = numberOfCards;
                       return {'playerInfo': playerInfo};
+                  }, function(state, props) {
+                      that.newSession();
                   });
               },
               newSession: function() {
@@ -411,8 +436,9 @@
                   }
                   var myApp = this;
                   sendClueRequest(data, function(json) {
+                      // TODO - clear history?
                       myApp.setState({'session': json.session});
-                      myApp.updateCardInfo(json.session);
+                      myApp.updateCardInfo(json.session, false);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
                   });
@@ -430,24 +456,28 @@
               },
               setGameString: function(s) {
                   this.setState({session: s});
-                  this.updateCardInfo(s);
+                  this.updateCardInfo(s, true);
               },
-              updateCardInfo: function(session) {
+              updateCardInfo: function(session, haveEnteredData) {
                   var data = "sess=" + session + "&action=fullInfo";
                   var myApp = this;
                   sendClueRequest(data, function(json) {
-                      myApp.updateInfoFromJson(json);
+                      myApp.updateInfoFromJson(json, haveEnteredData);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
                   });
               },
-              updateInfoFromJson: function(json) {
-                  var playerInfo = this.internalSetNumberOfPlayers(this.state.playerInfo, json.numPlayers);
-                  for (var i = 0; i < json.numPlayers; ++i) {
-                      playerInfo[i][1] = json.numCards[i];
+              updateInfoFromJson: function(json, haveEnteredData) {
+                  var playerInfo = this.state.playerInfo;
+                  if (json.numPlayers) {
+                      playerInfo = this.internalSetNumberOfPlayers(this.state.playerInfo, json.numPlayers);
+                      for (var i = 0; i < json.numPlayers; ++i) {
+                          playerInfo[i][1] = json.numCards[i];
+                      }
                   }
-
-                  // TODO - lock number of players, etc. (if any info?)
+                  var totalCards = playerInfo.reduce(function(previousValue, currentValue) {
+                      return previousValue + currentValue[1];
+                  }, 0);
 
                   // TODO - something with clause info?
                   var newInfo = json.newInfo;
@@ -458,7 +488,7 @@
                       newCardInfo[cardIndex[0]][cardIndex[1]].state = newInfo[i].status;
                       newCardInfo[cardIndex[0]][cardIndex[1]].owners = newInfo[i].owner;
                   }
-                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session, 'isConsistent': json.isConsistent});
+                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session, 'isConsistent': json.isConsistent && totalCards == TOTAL_CARDS_FOR_PLAYERS, 'haveEnteredData': haveEnteredData});
               },
               componentWillMount: function() {
                   this.newSession();
@@ -470,7 +500,7 @@
                     <ReactTabs.Tab>Game info</ReactTabs.Tab>
                 </ReactTabs.TabList>
                 <ReactTabs.TabPanel>
-                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName} session={this.state.session} setGameString={this.setGameString}/>
+                    <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName} session={this.state.session} haveEnteredData={this.state.haveEnteredData} setGameString={this.setGameString} newSession={this.newSession}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
                     <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo} session={this.state.session} isConsistent={this.state.isConsistent} updateInfoFromJson={this.updateInfoFromJson}/>
