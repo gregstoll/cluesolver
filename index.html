@@ -39,6 +39,7 @@
           var CARD_STATES = Object.freeze({Unknown: 0, OwnedByPlayer: 1, OwnedByCasefile: 2});
 
           function sendClueRequest(data, successCallback, failureCallback) {
+              // TODO - show indicator of working
               $.ajax({url: SCRIPT_NAME, data: data, dataType: "json", complete: function(xhr, textStatus) {
                   if (textStatus != "success" && textStatus != "notmodified") {
                       failureCallback(textStatus);
@@ -125,7 +126,6 @@
                   this.props.setGameString(this.state.loadGameString);
               },
               render: function() {
-                  // TODO - show game state/load
                   return <div>
                     <NumberOfPlayers playerInfo={this.props.playerInfo} setNumberOfPlayers={this.props.setNumberOfPlayers}/>
                     <PlayerList playerInfo={this.props.playerInfo} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName}/>
@@ -194,18 +194,37 @@
                   return <tr><td style={{paddingLeft: 20, textAlign: 'left'}}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td><td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()}/></td></tr>;
               }
           });
+          var RefutingCardSelector = React.createClass({
+              handleChange: function(e) {
+                  this.props.setCardIndex(e.target.value.split(" ").map(function(x) { return parseInt(x, 10); }));
+              },
+              render: function() {
+                  var options = [];
+                  options.push(<option value="-1 -1" key="-1 -1">None/Unknown</option>);
+                  for (var i = 0; i < this.props.cardIndices.length; ++i) {
+                      var cardInfo = CARD_NAMES[i][this.props.cardIndices[i]];
+                      options.push(<option value={cardInfo['card_type'] + ' ' + cardInfo.index} key={cardInfo['card_type']}>{cardInfo.external}</option>);
+                  }
+                  return <span>Refuting card: <select value={this.props.cardIndex.join(' ')} onChange={this.handleChange}>{options}</select></span>;
+              }
+          });
+
           var CardSelector = React.createClass({
               handleChange: function(e) {
                   this.props.setCardIndex(e.target.value.split(" ").map(function(x) { return parseInt(x, 10); }));
               },
               render: function() {
                   var options = [];
-                  for (var i = 0; i < CARD_NAMES.length; ++i) {
+                  var allCardTypes = this.props.cardType == -1;
+                  var iMin = allCardTypes ? 0 : this.props.cardType;
+                  var iMax = allCardTypes ? CARD_TYPE_NAMES.length : (this.props.cardType + 1);
+                  var label = allCardTypes ? "Card" : CARD_TYPE_NAMES[this.props.cardType];
+                  for (var i = iMin; i < iMax; ++i) {
                       for (var j = 0; j < CARD_NAMES[i].length; ++j) {
                           options.push(<option value={i + ' ' + j} key={i + ' ' + j}>{CARD_NAMES[i][j].external}</option>);
                       }
                   }
-                  return <span>Card: <select value={this.props.cardIndex.join(' ')} onChange={this.handleChange}>{options}</select></span>;
+                  return <span>{label}: <select value={this.props.cardIndex.join(' ')} onChange={this.handleChange}>{options}</select></span>;
               }
           });
           var PlayerSelector = React.createClass({
@@ -214,11 +233,71 @@
               },
               render: function() {
                   var options = [];
+                  if (this.props.includeNone) {
+                      options.push(<option value={-1} key={-1}>None</option>);
+                  }
                   for (var i = 0; i < this.props.playerInfo.length; ++i) {
                       options.push(<option value={i} key={i}>{this.props.playerInfo[i][0]}</option>);
                   }
+                  if (this.props.includeSolution) {
+                      options.push(<option value={this.props.playerInfo.length} key={this.props.playerInfo.length}>Solution (case file)</option>);
+                  }
                   return <span>{this.props.label}: <select value={this.props.playerIndex} onChange={this.handleChange}>{options}</select></span>
               }
+          });
+          var SuggestACard = React.createClass({
+              getInitialState: function() {
+                  return {suggestingPlayerIndex: 0, refutingPlayerIndex: -1, cardIndices: [0, 0, 0], refutingCardIndex: [-1, -1]};
+              },
+              setSuggestingPlayerIndex: function(playerIndex) {
+                  this.setState({suggestingPlayerIndex: playerIndex});
+              },
+              setRefutingPlayerIndex: function(playerIndex) {
+                  this.setState({refutingPlayerIndex: playerIndex});
+              },
+              setRefutingCardIndex: function(cardIndex) {
+                  this.setState({refutingCardIndex: cardIndex});
+              },
+              setCardIndex: function(cardIndex) {
+                  // TODO - need to copy?
+                  var newCardIndices = this.state.cardIndices;
+                  newCardIndices[cardIndex[0]] = cardIndex[1];
+                  this.setState({cardIndices: newCardIndices});
+              },
+              sendSuggestion: function() {
+                  // TODOTODO
+                  var data = "sess=" + this.props.session + "&action=suggestion&suggestingPlayer=" + this.state.suggestingPlayerIndex;
+                  for (var i = 0; i < CARD_TYPE_NAMES.length; ++i) {
+                      data += "&card" + (i+1) + "=" + CARD_NAMES[i][this.state.cardIndices[i]].internal;
+                  }
+                  data += "&refutingPlayer=" + this.state.refutingPlayerIndex + "&refutingCard=";
+                  if (this.state.refutingCardIndex[0] == -1 && this.state.refutingCardIndex[1] == -1) {
+                      data += "None";
+                  }
+                  else {
+                      data += CARD_NAMES[this.state.refutingCard[0]][this.state.refutingCard[1]].internal;
+                  }
+                  var that = this;
+                  sendClueRequest(data, function(json) {
+                      // TODO - add to history
+                      that.props.updateInfoFromJson(json);
+                  }, function(errorText) {
+                      alert('Error: ' + errorText);
+                  });
+              },
+              render: function() {
+                  // TODO - hide suggesting player in refuting player box?
+                  return <div>
+                      <div><PlayerSelector label="Made by" includeSolution={false} playerInfo={this.props.playerInfo} playerIndex={this.state.suggestingPlayerIndex} setPlayerIndex={this.setSuggestingPlayerIndex}/></div>
+                      <div><CardSelector cardType={0} cardIndex={[0, this.state.cardIndices[0]]} setCardIndex={this.setCardIndex}/></div>
+                      <div><CardSelector cardType={1} cardIndex={[1, this.state.cardIndices[1]]} setCardIndex={this.setCardIndex}/></div>
+                      <div><CardSelector cardType={2} cardIndex={[2, this.state.cardIndices[2]]} setCardIndex={this.setCardIndex}/></div>
+                      <div><PlayerSelector label="Refuted by" includeSolution={false} includeNone={true} playerInfo={this.props.playerInfo} playerIndex={this.state.refutingPlayerIndex} setPlayerIndex={this.setRefutingPlayerIndex}/></div>
+                      <div><RefutingCardSelector cardIndex={this.state.refutingCardIndex} cardIndices={this.state.cardIndices} setCardIndex={this.setRefutingCardIndex} /></div>
+                      <button type="button" onClick={this.sendSuggestion}>Add info</button>
+                  </div>;
+              }
+
           });
           var WhoOwnsACard = React.createClass({
               getInitialState: function() {
@@ -230,11 +309,22 @@
               setPlayerIndex: function(newPlayerIndex) {
                   this.setState({playerIndex: newPlayerIndex});
               },
-              // TODO - add button, ajax request
+              sendWhoOwnsACard: function()
+              {
+                  var data = "sess=" + this.props.session + "&action=whoOwns&owner=" + this.state.playerIndex + "&card=" + CARD_NAMES[this.state.cardIndex[0]][this.state.cardIndex[1]].internal;
+                  var that = this;
+                  sendClueRequest(data, function(json) {
+                      // TODO - add to history
+                      that.props.updateInfoFromJson(json);
+                  }, function(errorText) {
+                      alert('Error: ' + errorText);
+                  });
+              },
               render: function() {
                   return <div>
-                      <div><CardSelector cardIndex={this.state.cardIndex} setCardIndex={this.setCardIndex}/></div>
-                      <div><PlayerSelector label="Owned by" playerInfo={this.props.playerInfo} playerIndex={this.state.playerIndex} setPlayerIndex={this.setPlayerIndex}/></div>
+                      <div><CardSelector cardType={-1} cardIndex={this.state.cardIndex} setCardIndex={this.setCardIndex}/></div>
+                      <div><PlayerSelector label="Owned by" includeSolution={true} includeNone={false} playerInfo={this.props.playerInfo} playerIndex={this.state.playerIndex} setPlayerIndex={this.setPlayerIndex}/></div>
+                      <button type="button" onClick={this.sendWhoOwnsACard}>Add info</button>
                   </div>;
               }
           });
@@ -254,10 +344,10 @@
                             <ReactTabs.Tab>Suggestion made</ReactTabs.Tab>
                         </ReactTabs.TabList>
                         <ReactTabs.TabPanel>
-                            <WhoOwnsACard playerInfo={this.props.playerInfo}/>
+                            <WhoOwnsACard playerInfo={this.props.playerInfo} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson}/>
                         </ReactTabs.TabPanel>
                         <ReactTabs.TabPanel>
-                            Suggest!
+                            <SuggestACard playerInfo={this.props.playerInfo} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson}/>
                         </ReactTabs.TabPanel>
                     </ReactTabs.Tabs>
                   </div>
@@ -343,37 +433,30 @@
                   var data = "sess=" + session + "&action=fullInfo";
                   var myApp = this;
                   sendClueRequest(data, function(json) {
-                      var playerInfo = myApp.internalSetNumberOfPlayers(myApp.state.playerInfo, json.numPlayers);
-                      for (var i = 0; i < json.numPlayers; ++i) {
-                          playerInfo[i][1] = json.numCards[i];
-                      }
-
-                      // TODO - lock number of players, etc. (if any info?)
-
-                      // TODO - something with clause info?
-                      // TODO - isConsistent
-                      var newInfo = json.newInfo;
-                      // TODO?
-                      //alert(myApp.state.cardInfo[0][0].owners);
-                      //var newCardInfo = $.extend(true, {}, myApp.state.cardInfo);
-                      var newCardInfo = [];
-                      for (var i = 0; i < CARD_NAMES.length; ++i) {
-                          newCardInfo.push([]);
-                          for (var j = 0; j < CARD_NAMES[i].length; ++j) {
-                              newCardInfo[i].push({'card_type': i, 'index': j, 'state': CARD_STATES.Unknown, 'owners': []});
-                          }
-                      }
-
-                      for (var i = 0; i < newInfo.length; ++i) {
-                          var cardIndex = myApp.cardIndexFromInternalName(newInfo[i].card);
-                          newCardInfo[cardIndex[0]][cardIndex[1]].state = newInfo[i].status;
-                          newCardInfo[cardIndex[0]][cardIndex[1]].owners = newInfo[i].owner;
-                      }
-                      //alert(newCardInfo[0][0].owners);
-                      myApp.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo});
+                      myApp.updateInfoFromJson(json);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
                   });
+              },
+              updateInfoFromJson: function(json) {
+                  var playerInfo = this.internalSetNumberOfPlayers(this.state.playerInfo, json.numPlayers);
+                  for (var i = 0; i < json.numPlayers; ++i) {
+                      playerInfo[i][1] = json.numCards[i];
+                  }
+
+                  // TODO - lock number of players, etc. (if any info?)
+
+                  // TODO - something with clause info?
+                  // TODO - isConsistent
+                  var newInfo = json.newInfo;
+                  //var newCardInfo = $.extend(true, {}, this.state.cardInfo);
+                  var newCardInfo = this.state.cardInfo;
+                  for (var i = 0; i < newInfo.length; ++i) {
+                      var cardIndex = this.cardIndexFromInternalName(newInfo[i].card);
+                      newCardInfo[cardIndex[0]][cardIndex[1]].state = newInfo[i].status;
+                      newCardInfo[cardIndex[0]][cardIndex[1]].owners = newInfo[i].owner;
+                  }
+                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session});
               },
               componentWillMount: function() {
                   this.newSession();
@@ -388,7 +471,7 @@
                     <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName} session={this.state.session} setGameString={this.setGameString}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
-                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo}/>
+                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo} session={this.state.session} updateInfoFromJson={this.updateInfoFromJson}/>
                 </ReactTabs.TabPanel>
             </ReactTabs.Tabs>
               }
