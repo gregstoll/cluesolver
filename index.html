@@ -12,6 +12,9 @@
         <script src="https://npmcdn.com/babel-core@5.8.38/browser.js"></script>
         <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.1.0.min.js"></script>
         <script src="react-tabs.min.js"></script>
+        <style>
+            .warning { color: red; background-color: #ddd;}
+        </style>
     </head>
     <body>
         <div id="reactTarget"></div>
@@ -337,7 +340,7 @@
                           infoRows.push(<SpecificCardInfo key={i + ' ' + j} info={this.props.cardInfo[i][j]} playerInfo={this.props.playerInfo}/>);
                       }
                   }
-                  return <div><table style={{cssFloat: 'left'}}><tbody>{infoRows}</tbody></table><div style={{cssFloat: 'left'}}>Enter new info:
+                  return <div><div style={{cssFloat: 'left'}}><div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div><table><tbody>{infoRows}</tbody></table></div><div style={{cssFloat: 'left'}}>Enter new info:
                     <ReactTabs.Tabs>
                         <ReactTabs.TabList>
                             <ReactTabs.Tab>Who owns a card</ReactTabs.Tab>
@@ -370,7 +373,7 @@
                       }
                   }
 
-                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo};
+                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true};
               },
               internalSetNumberOfPlayers: function(previousPlayerInfo, numberOfPlayers) {
                   var playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
@@ -447,7 +450,6 @@
                   // TODO - lock number of players, etc. (if any info?)
 
                   // TODO - something with clause info?
-                  // TODO - isConsistent
                   var newInfo = json.newInfo;
                   //var newCardInfo = $.extend(true, {}, this.state.cardInfo);
                   var newCardInfo = this.state.cardInfo;
@@ -456,7 +458,7 @@
                       newCardInfo[cardIndex[0]][cardIndex[1]].state = newInfo[i].status;
                       newCardInfo[cardIndex[0]][cardIndex[1]].owners = newInfo[i].owner;
                   }
-                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session});
+                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session, 'isConsistent': json.isConsistent});
               },
               componentWillMount: function() {
                   this.newSession();
@@ -471,7 +473,7 @@
                     <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName} session={this.state.session} setGameString={this.setGameString}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
-                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo} session={this.state.session} updateInfoFromJson={this.updateInfoFromJson}/>
+                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo} session={this.state.session} isConsistent={this.state.isConsistent} updateInfoFromJson={this.updateInfoFromJson}/>
                 </ReactTabs.TabPanel>
             </ReactTabs.Tabs>
               }
