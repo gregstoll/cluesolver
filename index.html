@@ -14,6 +14,8 @@
         <script src="react-tabs.min.js"></script>
         <style>
             .warning { color: red; background-color: #ddd;}
+            .working { text-align: center; position: fixed; top: 0px; left: 50%; z-index: 101}
+            .workingInner { background-color: lightYellow; }
         </style>
     </head>
     <body>
@@ -41,21 +43,6 @@
               }
           }
           var CARD_STATES = Object.freeze({Unknown: 0, OwnedByPlayer: 1, OwnedByCasefile: 2});
-
-          function sendClueRequest(data, successCallback, failureCallback) {
-              // TODO - show indicator of working
-              $.ajax({url: SCRIPT_NAME, data: data, dataType: "json", complete: function(xhr, textStatus) {
-                  if (textStatus != "success" && textStatus != "notmodified") {
-                      failureCallback(textStatus);
-                      return;
-                  }
-                  if (xhr.responseJSON.errorStatus != 0) {
-                      failureCallback(xhr.responseJSON.errorText);
-                      return;
-                  }
-                  successCallback(xhr.responseJSON);
-              }});
-          }
 
           var NumberOfPlayerOption = React.createClass({
               handleChange: function() {
@@ -282,11 +269,12 @@
                       data += "None";
                   }
                   else {
-                      data += CARD_NAMES[this.state.refutingCard[0]][this.state.refutingCard[1]].internal;
+                      data += CARD_NAMES[this.state.refutingCardIndex[0]][this.state.refutingCardIndex[1]].internal;
                   }
+                  var description = ['suggestion', this.state.suggestingPlayerIndex, this.state.cardIndices[0], this.state.cardIndices[1], this.state.cardIndices[2], this.state.refutingPlayerIndex, this.state.refutingCardIndex];
                   var that = this;
-                  sendClueRequest(data, function(json) {
-                      // TODO - add to history
+                  this.props.sendClueRequest(data, function(json) {
+                      that.props.addToHistory(description);
                       that.props.updateInfoFromJson(json, true);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
@@ -319,9 +307,10 @@
               sendWhoOwnsACard: function()
               {
                   var data = "sess=" + this.props.session + "&action=whoOwns&owner=" + this.state.playerIndex + "&card=" + CARD_NAMES[this.state.cardIndex[0]][this.state.cardIndex[1]].internal;
+                  var description = ['whoOwns', this.state.playerIndex, this.state.cardIndex];
                   var that = this;
-                  sendClueRequest(data, function(json) {
-                      // TODO - add to history
+                  this.props.sendClueRequest(data, function(json) {
+                      that.props.addToHistory(description);
                       that.props.updateInfoFromJson(json, true);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
@@ -333,6 +322,21 @@
                       <div><PlayerSelector label="Owned by" includeSolution={true} includeNone={false} playerInfo={this.props.playerInfo} playerIndex={this.state.playerIndex} setPlayerIndex={this.setPlayerIndex}/></div>
                       <button type="button" onClick={this.sendWhoOwnsACard}>Add info</button>
                   </div>;
+              }
+          });
+          var ClauseInfo = React.createClass({
+              render: function() {
+                  var rows = [];
+                  for (var playerIndex in this.props.clauseInfo) {
+                      var info = this.props.clauseInfo[playerIndex];
+                      for (var i = 0; i < info.length; ++i) {
+                          var s = this.props.playerInfo[playerIndex][0] + " has ";
+                          var names = info[i].map(function(x) { return CARD_NAMES[x[0]][x[1]].external; });
+                          s += names.join(' or ');
+                          rows.push(<tr key={playerIndex + ' ' + i}><td>{s}</td></tr>);
+                      }
+                  }
+                  return <table><tbody>{rows}</tbody></table>;
               }
           });
           var GameInfo = React.createClass({
@@ -351,14 +355,55 @@
                             <ReactTabs.Tab>Suggestion made</ReactTabs.Tab>
                         </ReactTabs.TabList>
                         <ReactTabs.TabPanel>
-                            <WhoOwnsACard playerInfo={this.props.playerInfo} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson}/>
+                            <WhoOwnsACard playerInfo={this.props.playerInfo} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson} addToHistory={this.props.addToHistory} sendClueRequest={this.props.sendClueRequest} />
                         </ReactTabs.TabPanel>
                         <ReactTabs.TabPanel>
-                            <SuggestACard playerInfo={this.props.playerInfo} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson}/>
+                            <SuggestACard playerInfo={this.props.playerInfo} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson} addToHistory={this.props.addToHistory} sendClueRequest={this.props.sendClueRequest} />
                         </ReactTabs.TabPanel>
                     </ReactTabs.Tabs>
                   </div>
-                  <div style={{clear: 'both'}}/></div>;
+                  <div style={{clear: 'both'}}/><ClauseInfo clauseInfo={this.props.clauseInfo} playerInfo={this.props.playerInfo} /></div>;
+              }
+          });
+          var History = React.createClass({
+              doUndo: function() {
+                  this.props.doUndo();
+              },
+              render: function() {
+                  var entries = [];
+                  for (var i = 0; i < this.props.history.length; ++i)
+                  {
+                      var event = this.props.history[i][0];
+                      var eventType = event[0];
+                      var description = '';
+                      if (eventType === "suggestion") {
+                          description = this.props.playerInfo[event[1]][0] + " suggested " + CARD_NAMES[0][event[2]].external + ", " + CARD_NAMES[1][event[3]].external + ", " + CARD_NAMES[2][event[4]].external + " ";
+                          if (event[5] == -1) {
+                              description += " - no one refuted";
+                          }
+                          else {
+                              description += " - refuted by " + this.props.playerInfo[event[5]][0] + " with card ";
+                              if (event[6][0] == -1 && event[6][1] == -1) {
+                                  description += "Unknown";
+                              }
+                              else {
+                                  description += CARD_NAMES[event[6][0]][event[6][1]].external;
+                              }
+                          }
+                      } else if (eventType === "whoOwns") {
+                          var player = "Solution (case file)";
+                          if (event[1] < this.props.playerInfo.length) {
+                              player = this.props.playerInfo[event[1]][0];
+                          }
+                          description = CARD_NAMES[event[2][0]][event[2][1]].external + " owned by " + player;
+                      }
+                      entries.push(<li key={i}>{description}</li>);
+                  }
+
+                  return <div>
+                    <ul>{entries}</ul>
+                    <div><button type="button" disabled={entries.length == 0} onClick={this.doUndo}>Undo latest information</button></div>
+                  </div>;
               }
           });
           var App = React.createClass({
@@ -377,7 +422,7 @@
                       }
                   }
 
-                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false};
+                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false, 'clauseInfo': {}, 'history': [], 'working': false};
               },
               internalSetNumberOfPlayers: function(previousPlayerInfo, numberOfPlayers) {
                   var playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
@@ -435,9 +480,8 @@
                       data += "&numCards" + i + "=" + this.state.playerInfo[i][1];
                   }
                   var myApp = this;
-                  sendClueRequest(data, function(json) {
-                      // TODO - clear history?
-                      myApp.setState({'session': json.session});
+                  this.sendClueRequest(data, function(json) {
+                      myApp.setState({'session': json.session, 'history': []});
                       myApp.updateCardInfo(json.session, false);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
@@ -458,10 +502,13 @@
                   this.setState({session: s});
                   this.updateCardInfo(s, true);
               },
-              updateCardInfo: function(session, haveEnteredData) {
+              updateCardInfo: function(session, haveEnteredData, callback) {
                   var data = "sess=" + session + "&action=fullInfo";
                   var myApp = this;
-                  sendClueRequest(data, function(json) {
+                  this.sendClueRequest(data, function(json) {
+                      if (callback) {
+                          callback();
+                      }
                       myApp.updateInfoFromJson(json, haveEnteredData);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
@@ -479,7 +526,20 @@
                       return previousValue + currentValue[1];
                   }, 0);
 
-                  // TODO - something with clause info?
+                  var jsonClauseInfo = json.clauseInfo;
+                  var clauseInfo = {};
+                  if (jsonClauseInfo) {
+                      for (var playerIndex in jsonClauseInfo) {
+                          clauseInfo[playerIndex] = [];
+                          for (var i = 0; i < jsonClauseInfo[playerIndex].length; ++i) {
+                              var clause = [];
+                              for (var j = 0; j < jsonClauseInfo[playerIndex][i].length; ++j) {
+                                  clause.push(this.cardIndexFromInternalName(jsonClauseInfo[playerIndex][i][j]));
+                              }
+                              clauseInfo[playerIndex].push(clause);
+                          }
+                      }
+                  }
                   var newInfo = json.newInfo;
                   //var newCardInfo = $.extend(true, {}, this.state.cardInfo);
                   var newCardInfo = this.state.cardInfo;
@@ -488,24 +548,68 @@
                       newCardInfo[cardIndex[0]][cardIndex[1]].state = newInfo[i].status;
                       newCardInfo[cardIndex[0]][cardIndex[1]].owners = newInfo[i].owner;
                   }
-                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session, 'isConsistent': json.isConsistent && totalCards == TOTAL_CARDS_FOR_PLAYERS, 'haveEnteredData': haveEnteredData});
+                  this.setState({'cardInfo': newCardInfo, 'playerInfo': playerInfo, 'session': json.session, 'clauseInfo': clauseInfo, 'isConsistent': json.isConsistent && totalCards == TOTAL_CARDS_FOR_PLAYERS, 'haveEnteredData': haveEnteredData});
+              },
+              addToHistory(entry) {
+                  var session = this.state.session;
+                  this.setState(function(previousState, currentProps) {
+                      var history = previousState.history;
+                      history.push([entry, session]);
+                      return {'history': history};
+                  });
+              },
+              doUndo: function() {
+                  if (this.state.history.length > 0) {
+                      var that = this;
+                      this.updateCardInfo(this.state.history[this.state.history.length - 1][1], this.state.history.length > 1, function() {
+                          that.setState({'history': that.state.history.slice(0, that.state.history.length - 1)});
+                      });
+                  }
+              },
+              sendClueRequest: function(data, successCallback, failureCallback) {
+                  this.setState({working: true});
+                  var that = this;
+                  $.ajax({url: SCRIPT_NAME, data: data, dataType: "json", complete: function(xhr, textStatus) {
+                      that.setState({working: false});
+                      if (textStatus != "success" && textStatus != "notmodified") {
+                          failureCallback(textStatus);
+                          return;
+                      }
+                      if (xhr.responseJSON.errorStatus != 0) {
+                          failureCallback(xhr.responseJSON.errorText);
+                          return;
+                      }
+                      successCallback(xhr.responseJSON);
+                  }});
               },
               componentWillMount: function() {
                   this.newSession();
               },
               render: function() {
-                  return <ReactTabs.Tabs>
-                <ReactTabs.TabList>
+                  var working = undefined;
+                  if (this.state.working) {
+                      working = <p className="working"><span className="workingInner">Working...<img src="loading.gif"/></span></p>
+                  }
+
+                  return <div>
+                  {working}
+                  <ReactTabs.Tabs>
+                  <ReactTabs.TabList>
                     <ReactTabs.Tab>Game setup</ReactTabs.Tab>
                     <ReactTabs.Tab>Game info</ReactTabs.Tab>
+                    <ReactTabs.Tab>Undo and history</ReactTabs.Tab>
                 </ReactTabs.TabList>
                 <ReactTabs.TabPanel>
                     <GameSetup playerInfo={this.state.playerInfo} setNumberOfPlayers={this.setNumberOfPlayers} setNumberOfCards={this.setNumberOfCards} setPlayerName={this.setPlayerName} session={this.state.session} haveEnteredData={this.state.haveEnteredData} setGameString={this.setGameString} newSession={this.newSession}/>
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
-                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo} session={this.state.session} isConsistent={this.state.isConsistent} updateInfoFromJson={this.updateInfoFromJson}/>
+                    <GameInfo playerInfo={this.state.playerInfo} cardInfo={this.state.cardInfo} session={this.state.session} isConsistent={this.state.isConsistent} clauseInfo={this.state.clauseInfo} updateInfoFromJson={this.updateInfoFromJson} addToHistory={this.addToHistory} sendClueRequest={this.sendClueRequest} />
                 </ReactTabs.TabPanel>
-            </ReactTabs.Tabs>
+                <ReactTabs.TabPanel>
+                    <History playerInfo={this.state.playerInfo} history={this.state.history} doUndo={this.doUndo} />
+                </ReactTabs.TabPanel>
+                </ReactTabs.Tabs>
+              </div>;
               }
           });
           ReactDOM.render(<App/>, document.getElementById('reactTarget'));
