@@ -6,20 +6,59 @@
         <title>Clue Solver</title>
 
         <!-- The core React library -->
-        <script src="https://npmcdn.com/react@15.3.0/dist/react-with-addons.js"></script>
+        <script src="https://npmcdn.com/react@15.3.0/dist/react-with-addons.min.js"></script>
         <!-- The ReactDOM Library -->
-        <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.js"></script>
-        <script src="https://npmcdn.com/babel-core@5.8.38/browser.js"></script>
+        <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.min.js"></script>
+        <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
         <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.1.0.min.js"></script>
         <script src="react-tabs.min.js"></script>
         <style>
+            body {
+                /*color: black;
+                font-family: Helvetica, Arial, sans-serif;*/
+                font-size: 14px;
+            }
             .warning { color: red; background-color: #ddd;}
             .working { text-align: center; position: fixed; top: 0px; left: 50%; z-index: 101}
             .workingInner { background-color: lightYellow; }
         </style>
     </head>
     <body>
+        <h1>Clue Solver</h1>
+        <p><a href="#about">About this project</a></p>
         <div id="reactTarget"></div>
+        <p id="about"><b>About this project:</b> <a href="http://en.wikipedia.org/wiki/Cluedo">Clue</a> (or Cluedo outside of North America) is a game published
+by Hasbro in which players make accusations to try to determine who killed Mr.
+Boddy.  This application takes information about the game (including what cards
+you have and which suggestions are disproved by whom) to figure out who has
+which cards, and thus who the killer is.</p>
+        <p>To get a quick start, load one of these sample clue games and play around with the Game Info and Simulations:</p>
+        <ul>
+            <li>63-QLU.3-ANQIHOLUMG.3-QLU-AMG-ANH-AOI.3QLU-AFECSNBTIHKOGRPMJD.3-QLU.3-QLU.3-QLU.</li>
+            <li>54TNJS-AFECBIHKOLURQPMGD.4-ANSTOJ-FHP.4-ANSTOKJP.3-FNSHTJP-AO-AK.3-FNSHTJP.3-TNJS. (the simulation for this one has lots of colors :-) )</li>
+        </ul>
+        <p>The front-end was developed using <a href="https://facebook.github.io/react/">React</a>, the back-end is written in Python, and
+        they communicate in the <a href="http://json.org">JSON</a> data format.  A previous version of this <a href="/cluesolver_gwt/">used the Google Web Toolkit</a>.</p>
+        <p>I originally tried to write the back-end using first-order logic (see
+<a href="http://gregstoll.livejournal.com/tag/cluesolver">discussions on my
+LiveJournal</a>), and then propositional logic, but ended up rolling my own
+deduction, which was sort of disappointing.</p>
+        <p>The simulations are only reliable to within a few percent (it only
+does 2000 of them) - basically it chooses each possible solution, tries to
+assign cards to each player and sees if the solution is consistent or not (and if so, counts it).</p>
+        <p>The name suggestions are taken from <a href="http://www.census.gov/genealogy/names/names_files.html">popular names from the 1990s census</a> - I took the top 750 for males and females.</p>
+        <p>The images on the Game Info tab are taken from the <a href="http://www.famfamfam.com/lab/icons/silk/">Silk icon set at famfamfam.com</a> - thanks!</p>
+        <p>Clue is a registered trademark of Hasbro, inc.  <a href="http://www.hasbro.com/games/parkerbrothers/clue/">Official Clue site</a></p>
+  <p>Here are my source files:</p>
+  <ul>
+      <li><a href="clueengine.py.txt">clueengine.py</a> - the Python backend that does the deductions and simulations.</li>
+      <li><a href="clue.py.txt">clue.py</a> - the CGI script that handles communications between the frontend and cluesolver.py.</li>
+      <li><a href="json.py.txt">json.py</a> - the Python code for writing JSON-formatted messages, taken from <a href="http://sourceforge.net/projects/json-py/">the sourceforge project json-py</a>.</li>
+  </ul>
+
+        <p><a href="/">Greg's home page</a></p>
+        <!--#include virtual="/endOfBody.html"-->
+        
         <script type="text/babel">
           var SCRIPT_NAME = "clue.cgi";
           var MIN_PLAYERS = 3;
@@ -59,7 +98,7 @@
                   for (var i = MIN_PLAYERS; i <= MAX_PLAYERS; ++i) {
                       options.push(<NumberOfPlayerOption thisNumberOfPlayers={i} numberOfPlayers={this.props.playerInfo.length} key={i} setNumberOfPlayers={this.props.setNumberOfPlayers} allowChange={this.props.allowChange}/>);
                   }
-                  return <div><p>Number of players:</p><form>{options}</form></div>;
+                  return <div><span>Number of players:</span><form style={{display: 'inline'}}>{options}</form></div>;
               }
           });
           var PlayerNumberOfCards = React.createClass({
@@ -412,13 +451,15 @@
                   var that = this;
                   this.props.sendClueRequest('sess=' + this.props.session + '&action=simulate', function(json) {
                       var simData = {};
+                      var totalNumberOfSims = 0;
                       for (var key in json.simData) {
                           var data = json.simData[key];
-                          var totalNumberOfSims = data.reduce(function(previousValue, currentValue) { return previousValue + currentValue; }, 0);
+                          totalNumberOfSims = data.reduce(function(previousValue, currentValue) { return previousValue + currentValue; }, 0);
                           var cardIndex = that.props.cardIndexFromInternalName(key);
                           simData[cardIndex[0] + ' ' + cardIndex[1]] = data.map(function(x) { return x / totalNumberOfSims;});
                       }
                       that.props.setDoingSimulation(false);
+                      that.props.setNumberOfSimulations(totalNumberOfSims);
                       that.props.setSimulationData(simData);
                   }, function(errorText) {
                       alert('Error: ' + errorText);
@@ -442,7 +483,7 @@
                   // Interpolation between
                   // (3, 146, 207) blue
                   // (123, 192, 67) green
-                  // (253, 244, 152) yellow
+                  //// (253, 244, 152) yellow
                   // (243, 119, 54) orange
                   // (238, 64, 53) red
                   // http://www.color-hex.com/color-palette/807
@@ -460,9 +501,8 @@
                   for (var i = 0; i < this.props.playerInfo.length; ++i) {
                       playerHeaderEntries.push(<th key={"player" + i}>{this.props.playerInfo[i][0]}</th>);
                   }
-                  infoRows.push(<tr key="header"><th></th>{playerHeaderEntries}<th key="solution">Solution</th></tr>);
                   for (var i = 0; i < CARD_TYPE_NAMES.length; ++i) {
-                      infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th></tr>);
+                      infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th>{i == 0 ? playerHeaderEntries : undefined}</tr>);
                       for (var j = 0; j < CARD_NAMES[i].length; ++j) {
                           var cells = [<td key="cardName">{CARD_NAMES[i][j].external}</td>];
                           var dataArray = this.props.simData[i + ' ' + j];
@@ -489,9 +529,20 @@
                   }
                   var working = undefined;
                   if (this.props.doingSimulation) {
-                      working = <img src="loading.gif"/>;
+                      working = <img src="images/loading.gif"/>;
                   }
-                  return <div><div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div><div><button type="button" onClick={this.doSimulate} disabled={this.props.doingSimulation}>Simulate</button>{working}</div><table><tbody>{infoRows}</tbody></table></div>;
+                  var simulationSpan = undefined;
+                  if (this.props.numberOfSimulations > 0) {
+                      simulationSpan = <span style={{marginLeft: 20}}>Simulations done: {this.props.numberOfSimulations}</span>;
+                  }
+                  return <div>
+                    <div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div>
+                    <div><button type="button" onClick={this.doSimulate} disabled={this.props.doingSimulation}>Simulate</button>{working}{simulationSpan}</div>
+                    <div style={{display: 'flex'}}>
+                        <table><tbody>{infoRows}</tbody></table>
+                        <div style={{display: 'flex', verticalAlign: 'top', flexDirection: 'row', height: 300}}><img src="images/rainbow.png" /><div style={{display: 'flex', flexDirection: 'column', height: 300}}><div style={{alignSelf: 'flex-start'}}>0%</div><div style={{flex: 1}}/><div style={{alignSelf: 'flex-end'}}>100%</div></div></div>
+                    </div>
+                </div>;
               }
           });
           var App = React.createClass({
@@ -510,7 +561,7 @@
                       }
                   }
 
-                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false, 'clauseInfo': {}, 'history': [], 'working': false, 'simData': {}, 'doingSimulation': false};
+                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false, 'clauseInfo': {}, 'history': [], 'working': false, 'simData': {}, 'doingSimulation': false, 'numberOfSimulations': 0};
               },
               internalSetNumberOfPlayers: function(previousPlayerInfo, numberOfPlayers) {
                   var playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
@@ -657,6 +708,9 @@
               setSimulationData: function(data) {
                   this.setState({simData: data});
               },
+              setNumberOfSimulations: function(n) {
+                  this.setState({numberOfSimulations: n});
+              },
               setDoingSimulation: function(isDoingSimulation) {
                   this.setState({doingSimulation: isDoingSimulation});
               },
@@ -686,7 +740,7 @@
               render: function() {
                   var working = undefined;
                   if (this.state.working) {
-                      working = <p className="working"><span className="workingInner">Working...<img src="loading.gif"/></span></p>
+                      working = <p className="working"><span className="workingInner">Working...<img src="images/loading.gif"/></span></p>
                   }
 
                   return <div>
@@ -708,7 +762,7 @@
                     <History playerInfo={this.state.playerInfo} history={this.state.history} doUndo={this.doUndo} />
                 </ReactTabs.TabPanel>
                 <ReactTabs.TabPanel>
-                    <Simulation playerInfo={this.state.playerInfo} session={this.state.session} isConsistent={this.state.isConsistent} sendClueRequest={this.sendClueRequest} cardIndexFromInternalName={this.cardIndexFromInternalName} simData={this.state.simData} doingSimulation={this.state.doingSimulation} setSimulationData={this.setSimulationData} setDoingSimulation={this.setDoingSimulation}/>
+                    <Simulation playerInfo={this.state.playerInfo} session={this.state.session} isConsistent={this.state.isConsistent} sendClueRequest={this.sendClueRequest} cardIndexFromInternalName={this.cardIndexFromInternalName} simData={this.state.simData} numberOfSimulations={this.state.numberOfSimulations} doingSimulation={this.state.doingSimulation} setSimulationData={this.setSimulationData} setNumberOfSimulations={this.setNumberOfSimulations} setDoingSimulation={this.setDoingSimulation}/>
                 </ReactTabs.TabPanel>
                 </ReactTabs.Tabs>
               </div>;
