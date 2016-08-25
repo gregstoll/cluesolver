@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -46,11 +46,11 @@ deduction, which was sort of disappointing.</p>
         <p>The simulations are only reliable to within a few percent (it only
 does 2000 of them) - basically it chooses each possible solution, tries to
 assign cards to each player and sees if the solution is consistent or not (and if so, counts it).</p>
-        <p>The name suggestions are taken from <a href="http://www.census.gov/genealogy/names/names_files.html">popular names from the 1990s census</a> - I took the top 750 for males and females.</p>
         <p>The images on the Game Info tab are taken from the <a href="http://www.famfamfam.com/lab/icons/silk/">Silk icon set at famfamfam.com</a> - thanks!</p>
         <p>Clue is a registered trademark of Hasbro, inc.  <a href="http://www.hasbro.com/games/parkerbrothers/clue/">Official Clue site</a></p>
   <p>Here are my source files:</p>
   <ul>
+      <li>The UI code (using the React framework) is all in this file - just View Source to take a look!</li>
       <li><a href="clueengine.py.txt">clueengine.py</a> - the Python backend that does the deductions and simulations.</li>
       <li><a href="clue.py.txt">clue.py</a> - the CGI script that handles communications between the frontend and cluesolver.py.</li>
       <li><a href="json.py.txt">json.py</a> - the Python code for writing JSON-formatted messages, taken from <a href="http://sourceforge.net/projects/json-py/">the sourceforge project json-py</a>.</li>
@@ -140,7 +140,7 @@ assign cards to each player and sees if the solution is consistent or not (and i
                   }, 0);
                   var badNumberOfCardsElem = null;
                   if (totalNumberOfCards != TOTAL_CARDS_FOR_PLAYERS) {
-                      badNumberOfCardsElem = <span style={{'color': 'red'}}>Total number of cards must total {TOTAL_CARDS_FOR_PLAYERS}! (not {totalNumberOfCards})</span>;
+                      badNumberOfCardsElem = <span className="warning">Total number of cards must total {TOTAL_CARDS_FOR_PLAYERS}! (not {totalNumberOfCards})</span>;
                   }
                   return <div>{badNumberOfCardsElem}</div>;
               }
@@ -540,7 +540,7 @@ assign cards to each player and sees if the solution is consistent or not (and i
                     <div><button type="button" onClick={this.doSimulate} disabled={this.props.doingSimulation}>Simulate</button>{working}{simulationSpan}</div>
                     <div style={{display: 'flex'}}>
                         <table><tbody>{infoRows}</tbody></table>
-                        <div style={{display: 'flex', verticalAlign: 'top', flexDirection: 'row', height: 300}}><img src="images/rainbow.png" /><div style={{display: 'flex', flexDirection: 'column', height: 300}}><div style={{alignSelf: 'flex-start'}}>0%</div><div style={{flex: 1}}/><div style={{alignSelf: 'flex-end'}}>100%</div></div></div>
+                        <div style={{display: 'flex', verticalAlign: 'top', flexDirection: 'row', height: 300}}><img src="images/rainbow.png" style={{height: 300, width: 50}}/><div style={{display: 'flex', flexDirection: 'column', height: 300}}><div style={{alignSelf: 'flex-start'}}>0%</div><div style={{flex: 1}}/><div style={{alignSelf: 'flex-end'}}>100%</div></div></div>
                     </div>
                 </div>;
               }
