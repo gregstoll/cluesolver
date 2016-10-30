@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Clue Solver</title>
 
+        <!--#include virtual="/bootstraphead.html"-->
         <!-- The core React library -->
         <script src="https://npmcdn.com/react@15.3.0/dist/react-with-addons.min.js"></script>
         <!-- The ReactDOM Library -->
@@ -21,9 +22,21 @@
             .warning { color: red; background-color: #ddd;}
             .working { text-align: center; position: fixed; top: 0px; left: 50%; z-index: 101}
             .workingInner { background-color: lightYellow; }
+
+            input[type="radio"] {
+               border-radius: 100% !important;
+               margin-block-end: 0;
+               margin-block-start: 3px;
+               margin-inline-end: 3px;
+               margin-inline-start: 5px;
+            }
+            .playerHeader { padding-left: 5px; padding-right: 5px; }
+
         </style>
     </head>
     <body>
+  <!--#include virtual="/navbar.html"-->
+        <div class="container">
         <h1>Clue Solver</h1>
         <p><a href="#about">About this project</a></p>
         <div id="reactTarget"></div>
@@ -499,8 +512,9 @@ assign cards to each player and sees if the solution is consistent or not (and i
                   var infoRows = [];
                   var playerHeaderEntries = [];
                   for (var i = 0; i < this.props.playerInfo.length; ++i) {
-                      playerHeaderEntries.push(<th key={"player" + i}>{this.props.playerInfo[i][0]}</th>);
+                      playerHeaderEntries.push(<th className="playerHeader" key={"player" + i}>{this.props.playerInfo[i][0]}</th>);
                   }
+                  playerHeaderEntries.push(<th className="playerHeader" key="solution">Solution</th>);
                   for (var i = 0; i < CARD_TYPE_NAMES.length; ++i) {
                       infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th>{i == 0 ? playerHeaderEntries : undefined}</tr>);
                       for (var j = 0; j < CARD_NAMES[i].length; ++j) {
@@ -533,7 +547,7 @@ assign cards to each player and sees if the solution is consistent or not (and i
                   }
                   var simulationSpan = undefined;
                   if (this.props.numberOfSimulations > 0) {
-                      simulationSpan = <span style={{marginLeft: 20}}>Simulations done: {this.props.numberOfSimulations}</span>;
+                      simulationSpan = <span style={{marginLeft: 20, fontStyle: "italic"}}>Simulations done: {this.props.numberOfSimulations}</span>;
                   }
                   return <div>
                     <div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div>
@@ -770,5 +784,6 @@ assign cards to each player and sees if the solution is consistent or not (and i
           });
           ReactDOM.render(<App/>, document.getElementById('reactTarget'));
         </script>
+    </div>
     </body>
 </html>
