@@ -1,6 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import unittest, copy, random
+from functools import reduce
 
 class PlayerData:
     def __init__(self, clueengine, numCards, isSolutionPlayer=False):
@@ -283,24 +284,25 @@ class ClueEngine:
         s = s[1:]
         return s
 
+    @classmethod
+    def setOfCardsToSortedString(self, setOfCards):
+        return ''.join(sorted([ClueEngine.charFromCard(card) for card in setOfCards]))
+
     def writePlayerToString(self, idx):
         numCardsToWrite = self.players[idx].numCards
         # Always write one digit for simplicity
         if (numCardsToWrite == -1):
             numCardsToWrite = 0
         s = '%d' % numCardsToWrite
-        for card in self.players[idx].hasCards:
-            s += ClueEngine.charFromCard(card)
+        s += ClueEngine.setOfCardsToSortedString(self.players[idx].hasCards)
         s += '-'
-        for card in self.players[idx].notHasCards:
-            s += ClueEngine.charFromCard(card)
+        s += ClueEngine.setOfCardsToSortedString(self.players[idx].notHasCards)
         if (len(self.players[idx].possibleCards) == 0):
             s += '.'
             return s
         s += '-'
         for possibleCardGroup in self.players[idx].possibleCards:
-            for card in possibleCardGroup:
-                s += ClueEngine.charFromCard(card)
+            s += ClueEngine.setOfCardsToSortedString(possibleCardGroup)
             s += '-'
         # But we want a . at the end, not -
         s = s[:-1]
@@ -389,7 +391,7 @@ class ClueEngine:
                 solutionPossibilities[cardtype] = list(set(self.cards[cardtype]).difference(set(self.players[self.numPlayers].notHasCards)))
         #print solutionPossibilities
         totalIterations = 2000
-        iterationsPerSoln = totalIterations / reduce(lambda x,y:x*y, [len(solutionPossibilities[x]) for x in solutionPossibilities])
+        iterationsPerSoln = totalIterations // reduce(lambda x,y:x*y, [len(solutionPossibilities[x]) for x in solutionPossibilities])
         for card1 in solutionPossibilities['weapon']:
             for card2 in solutionPossibilities['suspect']:
                 for card3 in solutionPossibilities['room']:
@@ -403,7 +405,7 @@ class ClueEngine:
                         cardsAvailable.update(set(self.cards[cardtype]))
                     for player in solnEngine.players:
                         cardsAvailable.difference_update(set(player.hasCards))
-                    for unused in xrange(iterationsPerSoln):
+                    for unused in range(iterationsPerSoln):
                         tempEngine = copy.deepcopy(solnEngine)
                         tempCardsAvailable = copy.deepcopy(cardsAvailable)
                         # Assign all values randomly.
@@ -447,7 +449,7 @@ class ClueEngine:
                                 for card in tempEngine.players[playerIdx].hasCards:
                                     simData[card][playerIdx] += 1
         #print numSimulations
-        return simData        
+        return simData
 
     @classmethod
     def validateCard(cls, card):
@@ -557,7 +559,7 @@ class TestCaseClueEngine(unittest.TestCase):
         ce = ClueEngine()
         cc = ce.suggest(0, 'ProfessorPlum', 'Knife', 'Hall', 3, 'Knife')
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife', 'Hall'))
-        self.assert_('Knife' in ce.players[3].hasCards)
+        self.assertTrue('Knife' in ce.players[3].hasCards)
         self.assertEqual(len(ce.players[3].notHasCards), 0)
         self.assertEqual(len(ce.players[3].possibleCards), 0)
 
@@ -567,15 +569,15 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(cc, self.makeSet('ProfessorPlum', 'Knife', 'Hall'))
         cc = ce.infoOnCard(1, 'ProfessorPlum', False)
         self.assertEqual(cc, self.makeSet(*ce.cards['suspect']))
-        self.assert_('ProfessorPlum' in ce.players[ce.numPlayers].hasCards)
-        self.assert_('ColonelMustard' in ce.players[ce.numPlayers].notHasCards)
-        self.assert_('Knife' not in ce.players[ce.numPlayers].hasCards)
-        self.assert_('Hall' not in ce.players[ce.numPlayers].hasCards)
-        self.assert_('ProfessorPlum' in ce.players[1].notHasCards)
-        self.assert_('Knife' not in ce.players[1].notHasCards)
-        self.assert_('Knife' not in ce.players[1].hasCards)
-        self.assert_('Knife' in ce.players[2].notHasCards)
-        self.assert_('Knife' in ce.players[0].notHasCards)
+        self.assertTrue('ProfessorPlum' in ce.players[ce.numPlayers].hasCards)
+        self.assertTrue('ColonelMustard' in ce.players[ce.numPlayers].notHasCards)
+        self.assertTrue('Knife' not in ce.players[ce.numPlayers].hasCards)
+        self.assertTrue('Hall' not in ce.players[ce.numPlayers].hasCards)
+        self.assertTrue('ProfessorPlum' in ce.players[1].notHasCards)
+        self.assertTrue('Knife' not in ce.players[1].notHasCards)
+        self.assertTrue('Knife' not in ce.players[1].hasCards)
+        self.assertTrue('Knife' in ce.players[2].notHasCards)
+        self.assertTrue('Knife' in ce.players[0].notHasCards)
         self.assertEqual(ce.playerHasCard(1, 'ProfessorPlum'), False)
         self.assertEqual(ce.playerHasCard(1, 'ColonelMustard'), -1)
         self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), -1)
@@ -750,7 +752,7 @@ class TestCaseClueEngine(unittest.TestCase):
         (ce, s) = ClueEngine.loadFromString('29A-.9-.3-.')
         self.assertEqual(s, '')
         self.assertEqual(len(ce.players[0].hasCards), 1)
-        self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
+        self.assertTrue(ce.playerHasCard(0, 'ProfessorPlum'))
         self.assertEqual(len(ce.players[0].notHasCards), 0)
         self.assertEqual(len(ce.players[1].hasCards), 0)
         self.assertEqual(len(ce.players[1].notHasCards), 1)
@@ -760,23 +762,23 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ce.playerHasCard(2, 'ProfessorPlum'), False)
         (ce, s) = ClueEngine.loadFromString('29A-B.9L-C.3U-.')
         self.assertEqual(s, '')
-        self.assert_(ce.playerHasCard(0, 'ProfessorPlum'))
+        self.assertTrue(ce.playerHasCard(0, 'ProfessorPlum'))
         self.assertEqual(ce.playerHasCard(0, 'ColonelMustard'), False)
-        self.assert_(ce.playerHasCard(1, 'Wrench'))
+        self.assertTrue(ce.playerHasCard(1, 'Wrench'))
         self.assertEqual(ce.playerHasCard(1, 'MrGreen'), False)
-        self.assert_(ce.playerHasCard(2, 'BilliardRoom'))
+        self.assertTrue(ce.playerHasCard(2, 'BilliardRoom'))
         (ce, s) = ClueEngine.loadFromString('29-.9A-B-CDE-FGH.3U-.')
         self.assertEqual(s, '')
-        self.assert_(ce.playerHasCard(1, 'ProfessorPlum'))
+        self.assertTrue(ce.playerHasCard(1, 'ProfessorPlum'))
         self.assertEqual(ce.playerHasCard(1, 'ColonelMustard'), False)
         self.assertEqual(len(ce.players[1].possibleCards), 2)
         self.assertEqual(ce.players[1].possibleCards[0], set([ClueEngine.cardFromChar('C'), ClueEngine.cardFromChar('D'), ClueEngine.cardFromChar('E')]))
         self.assertEqual(ce.players[1].possibleCards[1], set([ClueEngine.cardFromChar('F'), ClueEngine.cardFromChar('G'), ClueEngine.cardFromChar('H')]))
        
     def testWriteToString(self):
-        s = '29AH-BCD-KL-NM.9-AH.3-AH.'
+        s = '29AH-BCD-KL-MN.9-AH.3-AH.'
         self.assertEqual(s, ClueEngine.loadFromString(s)[0].writeToString())
-        s = '29-AU.9A-BU-ECD-FH.3U-ANSQRTOMP.'
+        s = '29-AU.9A-BU-CDE-FH.3U-AMNOPQRST.'
         self.assertEqual(s, ClueEngine.loadFromString(s)[0].writeToString())
 
 def main():
