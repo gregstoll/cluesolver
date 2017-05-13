@@ -247,12 +247,26 @@ assign cards to each player and sees if the solution is consistent or not (and i
               },
               render: function() {
                   var options = [];
-                  options.push(<option value="-1 -1" key="-1 -1">None/Unknown</option>);
+                  var invalidSelectedCard = true;
+                  options.push(<option value="-1 -1" key="-1">None/Unknown</option>);
+                  var selectedCardIndexString = this.props.cardIndex.join(' ');
+                  if (selectedCardIndexString == "-1 -1") {
+                      invalidSelectedCard = false;
+                  }
                   for (var i = 0; i < this.props.cardIndices.length; ++i) {
                       var cardInfo = CARD_NAMES[i][this.props.cardIndices[i]];
-                      options.push(<option value={cardInfo['card_type'] + ' ' + cardInfo.index} key={cardInfo['card_type']}>{cardInfo.external}</option>);
+                      var cardIndexString = cardInfo['card_type'] + ' ' + cardInfo.index;
+                      if (selectedCardIndexString == cardIndexString) {
+                          invalidSelectedCard = false;
+                      }
+                      options.push(<option value={cardIndexString} key={cardInfo['card_type']}>{cardInfo.external}</option>);
                   }
-                  return <span>Refuting card: <select value={this.props.cardIndex.join(' ')} onChange={this.handleChange}>{options}</select></span>;
+                  if (invalidSelectedCard) {
+                      // this happens if there's a selected refuting card, and then
+                      // the choices change so this isn't an option anymore
+                      this.props.setCardIndex([-1, -1]);
+                  }
+                  return <span>Refuting card: <select value={selectedCardIndexString} onChange={this.handleChange}>{options}</select></span>;
               }
           });
 
