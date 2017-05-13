@@ -66,10 +66,8 @@ assign cards to each player and sees if the solution is consistent or not (and i
       <li>The UI code (using the React framework) is all in this file - just View Source to take a look!</li>
       <li><a href="clueengine.py.txt">clueengine.py</a> - the Python backend that does the deductions and simulations.</li>
       <li><a href="clue.py.txt">clue.py</a> - the CGI script that handles communications between the frontend and cluesolver.py.</li>
-      <li><a href="json.py.txt">json.py</a> - the Python code for writing JSON-formatted messages, taken from <a href="http://sourceforge.net/projects/json-py/">the sourceforge project json-py</a>.</li>
   </ul>
 
-        <p><a href="/">Greg's home page</a></p>
         <!--#include virtual="/endOfBody.html"-->
         
         <script type="text/babel">
@@ -483,7 +481,12 @@ assign cards to each player and sees if the solution is consistent or not (and i
                           var data = json.simData[key];
                           totalNumberOfSims = data.reduce(function(previousValue, currentValue) { return previousValue + currentValue; }, 0);
                           var cardIndex = that.props.cardIndexFromInternalName(key);
-                          simData[cardIndex[0] + ' ' + cardIndex[1]] = data.map(function(x) { return x / totalNumberOfSims;});
+                          var cardKey = cardIndex[0] + ' ' + cardIndex[1];
+                          if (totalNumberOfSims > 0) {
+                              simData[cardKey] = data.map(function(x) { return x / totalNumberOfSims;});
+                          } else {
+                              simData[cardKey] = data.map(function(x) { return 0.0; });
+                          }
                       }
                       that.props.setDoingSimulation(false);
                       that.props.setNumberOfSimulations(totalNumberOfSims);
@@ -560,8 +563,12 @@ assign cards to each player and sees if the solution is consistent or not (and i
                       working = <img src="images/loading.gif"/>;
                   }
                   var simulationSpan = undefined;
-                  if (this.props.numberOfSimulations > 0) {
-                      simulationSpan = <span style={{marginLeft: 20, fontStyle: "italic"}}>Simulations done: {this.props.numberOfSimulations}</span>;
+                  if (this.props.numberOfSimulations > -1) {
+                      if (this.props.numberOfSimulations > 0) {
+                          simulationSpan = <span style={{marginLeft: 20, fontStyle: "italic"}}>Simulations done: {this.props.numberOfSimulations}</span>;
+                      } else {
+                          simulationSpan = <span className="warning" style={{marginLeft: 20, fontStyle: "italic"}}>No simulations done!</span>;
+                      }
                   }
                   return <div>
                     <div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div>
@@ -589,7 +596,7 @@ assign cards to each player and sees if the solution is consistent or not (and i
                       }
                   }
 
-                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false, 'clauseInfo': {}, 'history': [], 'working': false, 'simData': {}, 'doingSimulation': false, 'numberOfSimulations': 0};
+                  return {'playerInfo': playerInfo, 'cardInfo': cardInfo, 'isConsistent': true, 'haveEnteredData': false, 'clauseInfo': {}, 'history': [], 'working': false, 'simData': {}, 'doingSimulation': false, 'numberOfSimulations': -1};
               },
               internalSetNumberOfPlayers: function(previousPlayerInfo, numberOfPlayers) {
                   var playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
