@@ -769,14 +769,25 @@ class TestCaseClueEngine(unittest.TestCase):
     def testSimulation_trickyCase1_HasResults(self):
         (ce, s) = ClueEngine.loadFromString("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.")
         simData = ce.getSimulationData()
+        # No clauses here, so all simulations should succeed
+        solutionConfigurations = 2*4*6
+        expectedNumSimulations = (2000 // solutionConfigurations) * solutionConfigurations
         for card in simData:
-            self.assertTrue(sum(simData[card]) > 0)
+            self.assertEqual(expectedNumSimulations, sum(simData[card]))
     
     def testSimulation_trickyCase2_HasResults(self):
         (ce, s) = ClueEngine.loadFromString("45CPQRS-ABDEFGHIJKLMNOTU.5AGIMT-BCDEFHJKLNOPQRSU.4FK-ACDGIJLMPQRST-EO.4DL-ABCFGIJKMPQRST.3J-ACDFGHIKLMPQRST.")
         simData = ce.getSimulationData()
+        numSimulations = None
         for card in simData:
             self.assertTrue(sum(simData[card]) > 0)
+
+    def testSimulation_clausesPointToCard(self):
+        (ce, s) = ClueEngine.loadFromString("36-GM.6-GM-AHN-AIO-AJP.6-GM.3GM-HIJKLNOPQRSTU.")
+        simData = ce.getSimulationData()
+        # In this game player with index 1 has a bunch of clauses that include Professor Plum and other cards, so it's most likely he has that card
+        plumData = simData['ProfessorPlum']
+        self.assertEqual(plumData[1], max(plumData))
 
     def testCardFromChar(self):
         self.assertEqual(ClueEngine.cardFromChar('A'), 'ProfessorPlum')
