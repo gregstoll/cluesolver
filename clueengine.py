@@ -17,7 +17,7 @@ class PlayerData:
         self.numCards = numCards
 
     def __repr__(self):
-        return "PD(%d,%s,%s,%s)" % (self.numCards, self.hasCards, self.notHasCards, self.possibleCards)
+        return "PD(%d,%s,%s,%s)" % (self.numCards, sorted(self.hasCards, key=ClueEngine.charFromCard), sorted(self.notHasCards, key=ClueEngine.charFromCard), self.possibleCards)
 
     def infoOnCard(self, card, hasCard, updateClueEngine=True):
         changedCards = set()
@@ -202,7 +202,7 @@ class ClueEngine:
             # The case file always has exactly 3 cards, for what it's worth.
             return 3
         # There are 18 cards among the players.
-        numCards = 18 / numPlayers # Integer division
+        numCards = 18 // numPlayers # Integer division
         leftovers = 18 % numPlayers
         # Assume the earlier players get the extra cards
         if (playerIndex < leftovers):
@@ -368,6 +368,9 @@ class ClueEngine:
             return -1
 
     def getSimulationData(self):
+        debug = False # __name__ == '__main__'
+        if debug:
+            print("hi")
         simData = {}
         for cardtype in self.cards:
             for card in self.cards[cardtype]:
@@ -389,16 +392,27 @@ class ClueEngine:
                 # Take all possible cards, except for the ones we know aren't
                 # solutions
                 solutionPossibilities[cardtype] = list(set(self.cards[cardtype]).difference(set(self.players[self.numPlayers].notHasCards)))
-        #print solutionPossibilities
+        if debug:
+            print(solutionPossibilities)
         totalIterations = 2000
         iterationsPerSoln = totalIterations // reduce(lambda x,y:x*y, [len(solutionPossibilities[x]) for x in solutionPossibilities])
+        if debug:
+            print(iterationsPerSoln)
         for card1 in solutionPossibilities['weapon']:
             for card2 in solutionPossibilities['suspect']:
                 for card3 in solutionPossibilities['room']:
+                    tricky = (card1 == 'Candlestick' and card2 == 'ProfessorPlum' and card3 == 'Conservatory')
                     curSolution = [card1, card2, card3]
                     solnEngine = copy.deepcopy(self)
+                    if tricky and debug:
+                        print("Engine before is: %s" % solnEngine)
+                        print("Solution before is: %s" % solnEngine.players[solnEngine.numPlayers])
                     for solnCard in curSolution:
                         solnEngine.infoOnCard(solnEngine.numPlayers, solnCard, True)
+                        if tricky and debug:
+                            print("Solution after card %s is %s" % (solnCard, solnEngine.players[solnEngine.numPlayers]))
+                    if tricky and debug:
+                        print("Solution is now: %s" % solnEngine.players[solnEngine.numPlayers])
                     # Find the available free cards.
                     cardsAvailable = set()
                     for cardtype in solnEngine.cards:
@@ -413,16 +427,21 @@ class ClueEngine:
                             player = tempEngine.players[playerIdx]
                             numCardsNeeded = player.numCards - len(player.hasCards)
                             playerCardsAvailable = list(tempCardsAvailable.difference(player.notHasCards))
-                            #print "engine: %s ***cardsavailable: %s" % (repr(tempEngine), playerCardsAvailable)
-                            #print "available: %d numCardsNeeded: %d" % (len(playerCardsAvailable), numCardsNeeded)
+                            if debug and False:
+                                print("engine: %s ***cardsavailable: %s" % (repr(tempEngine), playerCardsAvailable))
+                                print("available: %d numCardsNeeded: %d" % (len(playerCardsAvailable), numCardsNeeded))
                             # If there are not enough cards available, we're
                             # inconsistent.
                             if (len(playerCardsAvailable) < numCardsNeeded):
-                                #print 'inconsistent on player %d' % playerIdx
-                                #print 'curSoln: %s' % curSolution
-                                #print 'player.hasCards: %s' % tempEngine.players[playerIdx].hasCards
-                                #print 'player.notHasCards: %s' % tempEngine.players[playerIdx].notHasCards
-                                #print 'available: %d needed: %d' % (len(playerCardsAvailable), numCardsNeeded)
+                                if debug:
+                                    print('inconsistent on player %d' % playerIdx)
+                                    print('curSoln: %s' % curSolution)
+                                    print('player.hasCards: %s' % tempEngine.players[playerIdx].hasCards)
+                                    print('player.notHasCards: %s' % tempEngine.players[playerIdx].notHasCards)
+                                    print('available: %d needed: %d' % (len(playerCardsAvailable), numCardsNeeded))
+                                    print("engine: %s" % (repr(tempEngine)))
+                                    if tricky:
+                                        sys.exit(1)
                                 tempCardsAvailable = set()
                             else:
                                 for i in range(numCardsNeeded):
@@ -436,11 +455,15 @@ class ClueEngine:
                         # All players assigned.  Check consistency.
                         isConsistent = True
                         for (i, player) in enumerate(tempEngine.players):
-                            if (len(player.hasCards.intersection(player.notHasCards)) > 0 or len(player.hasCards) != player.numCards):
+                            cardInTwoPlaces = len(player.hasCards.intersection(player.notHasCards)) > 0
+                            wrongNumberOfCards = len(player.hasCards) != player.numCards
+                            if (cardInTwoPlaces or wrongNumberOfCards):
                                 #if curSolution[0] == 'LeadPipe' and curSolution[1] == 'MissScarlet' and curSolution[2] == 'Library':
                                     #print "hasNot: %d, hasCards: %d i: %d" % (len(player.hasCards.intersection(player.notHasCards)), len(player.hasCards), i)
                                     #print 'hasCards: %s' % player.hasCards
                                     #print 'notHasCards: %s' % player.notHasCards
+                                if (debug and False):
+                                    print("player %d: cardInTwoPlaces %s wrongNumberOfCards %d" % (i, cardInTwoPlaces, len(player.hasCards)))
                                 isConsistent = False
                         if (isConsistent):
                             # Update statistics
@@ -519,8 +542,10 @@ class ClueEngine:
             if (isSolution and solutionCard != None):
                 # There's only one possibility, so this must be it!
                 if (solutionCard not in self.players[self.numPlayers].hasCards and solutionCard not in self.players[self.numPlayers].notHasCards):
-                    self.players[self.numPlayers].hasCards.add(solutionCard)
-                    changedCards.add(solutionCard)
+                    # also check to make sure we don't have another one in this category
+                    if (len(self.players[self.numPlayers].hasCards.intersection(allCards)) == 0):
+                        self.players[self.numPlayers].hasCards.add(solutionCard)
+                        changedCards.add(solutionCard)
         # Finally, see if any people share clauses in common.
         clauseHash = {}
         for idx in range(self.numPlayers):
@@ -721,6 +746,38 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ce.whoHasCard('Knife'), [1,3])
         self.assertEqual(ce.whoHasCard('Hall'), [0,2,4,5,6])
 
+    def testSimulation_KnownPersonHasCard(self):
+        ce = ClueEngine()
+        ce.infoOnCard(1, 'ProfessorPlum', True)
+        simData = ce.getSimulationData()
+        plumData = simData['ProfessorPlum']
+        self.assertTrue(plumData[1] > 0)
+        for i in range(ce.numPlayers + 1):
+            if i != 1:
+                self.assertEqual(plumData[i], 0)
+
+    def testSimulation_KnownPersonDoesNotHaveCard(self):
+        ce = ClueEngine()
+        ce.infoOnCard(1, 'ProfessorPlum', False)
+        simData = ce.getSimulationData()
+        plumData = simData['ProfessorPlum']
+        self.assertEqual(plumData[1], 0)
+        for i in range(ce.numPlayers + 1):
+            if i != 1:
+                self.assertTrue(plumData[i] > 0)
+
+    def testSimulation_trickyCase1_HasResults(self):
+        (ce, s) = ClueEngine.loadFromString("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.")
+        simData = ce.getSimulationData()
+        for card in simData:
+            self.assertTrue(sum(simData[card]) > 0)
+    
+    def testSimulation_trickyCase2_HasResults(self):
+        (ce, s) = ClueEngine.loadFromString("45CPQRS-ABDEFGHIJKLMNOTU.5AGIMT-BCDEFHJKLNOPQRSU.4FK-ACDGIJLMPQRST-EO.4DL-ABCFGIJKMPQRST.3J-ACDFGHIKLMPQRST.")
+        simData = ce.getSimulationData()
+        for card in simData:
+            self.assertTrue(sum(simData[card]) > 0)
+
     def testCardFromChar(self):
         self.assertEqual(ClueEngine.cardFromChar('A'), 'ProfessorPlum')
         self.assertEqual(ClueEngine.cardFromChar('B'), 'ColonelMustard')
@@ -793,6 +850,10 @@ if (__name__ == '__main__'):
     testRunner = unittest.TextTestRunner()
     testSuite = unittest.TestLoader().loadTestsFromTestCase(TestCaseClueEngine)
     testRunner.run(testSuite)
+
+    #(ce, s) = ClueEngine.loadFromString("36DQRKLC-AFESNBIHTOGUMJP.6T-FDSQIRKLBGC.6FB-TDQRKLPC.3-FTDQRKLBC.")
+    #(ce, s) = ClueEngine.loadFromString("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.")
+    #print(repr(ce.getSimulationData()))
     #import profile
     #profile.run('main()')
     #main()
