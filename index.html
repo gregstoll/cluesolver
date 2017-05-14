@@ -84,6 +84,17 @@ assign cards to each player and sees if the solution is consistent or not (and i
           var _EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Ms. White", "Mrs. Peacock"],
                                 ["Knife", "Candlestick", "Revolver", "Lead Pipe", "Rope", "Wrench"],
                                 ["Hall", "Conservatory", "Dining Room", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "Billiard Room"]];
+          function compareInternalCardsByCategory(card1, card2) {
+              return categoryFromInternalCard(card1) - categoryFromInternalCard(card2);
+          }
+          function categoryFromInternalCard(card) {
+              for (var i = 0; i < _INTERNAL_NAMES.length; ++i) {
+                  if (_INTERNAL_NAMES[i].indexOf(card) != -1) {
+                      return i;
+                  }
+              }
+              return 10;
+          }
           var CARD_TYPE_NAMES = ["Suspects", "Weapons", "Rooms"];
           var CARD_NAMES = [];
           for (var i = 0; i < _INTERNAL_NAMES.length; ++i) {
@@ -392,10 +403,11 @@ assign cards to each player and sees if the solution is consistent or not (and i
               render: function() {
                   var rows = [];
                   for (var playerIndex in this.props.clauseInfo) {
-                      var info = this.props.clauseInfo[playerIndex];
+                      // make a copy since we're modifying it
+                      var info = this.props.clauseInfo[playerIndex].slice();
                       for (var i = 0; i < info.length; ++i) {
                           var s = this.props.playerInfo[playerIndex][0] + " has ";
-                          var names = info[i].map(function(x) { return CARD_NAMES[x[0]][x[1]].external; });
+                          var names = info[i].sort(compareInternalCardsByCategory).map(function(x) { return CARD_NAMES[x[0]][x[1]].external; });
                           s += names.join(' or ');
                           rows.push(<tr key={playerIndex + ' ' + i}><td>{s}</td></tr>);
                       }
