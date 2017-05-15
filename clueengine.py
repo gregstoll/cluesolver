@@ -401,7 +401,7 @@ class ClueEngine:
         for card1 in solutionPossibilities['weapon']:
             for card2 in solutionPossibilities['suspect']:
                 for card3 in solutionPossibilities['room']:
-                    tricky = (card1 == 'Candlestick' and card2 == 'ProfessorPlum' and card3 == 'Conservatory')
+                    tricky = (card1 == 'Revolver' and card2 == 'ColonelMustard' and card3 == 'BilliardRoom')
                     curSolution = [card1, card2, card3]
                     solnEngine = copy.deepcopy(self)
                     if tricky and debug:
@@ -433,15 +433,15 @@ class ClueEngine:
                             # If there are not enough cards available, we're
                             # inconsistent.
                             if (len(playerCardsAvailable) < numCardsNeeded):
-                                if debug:
+                                if debug and False:
                                     print('inconsistent on player %d' % playerIdx)
                                     print('curSoln: %s' % curSolution)
                                     print('player.hasCards: %s' % tempEngine.players[playerIdx].hasCards)
                                     print('player.notHasCards: %s' % tempEngine.players[playerIdx].notHasCards)
                                     print('available: %d needed: %d' % (len(playerCardsAvailable), numCardsNeeded))
                                     print("engine: %s" % (repr(tempEngine)))
-                                    if tricky:
-                                        sys.exit(1)
+                                    #if tricky:
+                                    #    sys.exit(1)
                                 tempCardsAvailable = set()
                             else:
                                 for i in range(numCardsNeeded):
@@ -746,6 +746,15 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ce.whoHasCard('Knife'), [1,3])
         self.assertEqual(ce.whoHasCard('Hall'), [0,2,4,5,6])
 
+    def testAddCard_NoExtras(self):
+        (ce, s) = ClueEngine.loadFromString("63FJQ-ABCDEGHIKLMNOPRSTU.3T-CDFHIJKNOPQS.3-CDFHIJKMNOPQST.3NO-CDFHIJKMPQST.3K-CDFHIJNOPQT.3CD-FJNOQT.3-CDFJNOQT.")
+        ce.infoOnCard(6, 'Candlestick', True)
+        self.assertTrue(ce.isConsistent())
+        self.assertTrue('Candlestick' in ce.players[6].hasCards)
+        # This is the third green card, so Kitchen must be the solution
+        self.assertTrue('Kitchen' in ce.players[6].hasCards)
+        self.assertEqual(len(ce.players[6].hasCards), 2)
+
     def testSimulation_KnownPersonHasCard(self):
         ce = ClueEngine()
         ce.infoOnCard(1, 'ProfessorPlum', True)
@@ -812,7 +821,6 @@ class TestCaseClueEngine(unittest.TestCase):
         self.assertEqual(ClueEngine.charFromCard('InvalidCard'), '')
         for i in range(ord('A'), ord('V')):
             self.assertEqual(chr(i), ClueEngine.charFromCard(ClueEngine.cardFromChar(chr(i))))
-
 
     def testLoadFromString(self):
         (ce, s) = ClueEngine.loadFromString('29AH-BCD-KL-MN.9-AH.3-.')
