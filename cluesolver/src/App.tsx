@@ -171,7 +171,7 @@ interface GameSetupProps {
     setGameString: (gameString: string) => void,
     playerInfos: Array<PlayerInfo>,
     haveEnteredData: boolean,
-    session: string,
+    session: string | null,
     setNumberOfCards: (index: number, numberOfCards: number) => void,
     setPlayerName: (index: number, name: string) => void,
     setNumberOfPlayers: (numberOfPlayers: number) => void
@@ -253,7 +253,7 @@ interface AppState {
     simData: SimulationData,
     doingSimulation: boolean,
     numberOfSimulations: number,
-    session: string
+    session: string | null
 }
 
 class App extends Component<{}, AppState> {
@@ -283,10 +283,46 @@ class App extends Component<{}, AppState> {
             working: false,
             simData: new Map<CardIndex, Array<number>>(),
             doingSimulation: false,
-            numberOfSimulations: -1
+            numberOfSimulations: -1,
+            session: null
         };
-
     }
+    sendClueRequest(data, successCallback, failureCallback, skipWorking) {
+        if (!skipWorking) {
+            this.setState({working: true});
+        }
+        var that = this;
+        //TODO - does this work?
+        $.ajax({url: SCRIPT_NAME, data: data, dataType: "json", complete: function(xhr, textStatus) {
+            if (!skipWorking) {
+                that.setState({working: false});
+            }
+            if (textStatus != "success" && textStatus != "notmodified") {
+                failureCallback('from jQuery: ' + textStatus);
+                return;
+            }
+            if (xhr.responseJSON.errorStatus != 0) {
+                failureCallback(xhr.responseJSON.errorText);
+                return;
+            }
+            successCallback(xhr.responseJSON);
+        }});
+    }
+
+    newSession() {
+        var data = "action=new&players=" + this.state.playerInfos.length;
+        for (var i = 0; i < this.state.playerInfos.length; ++i) {
+            data += "&numCards" + i + "=" + this.state.playerInfos[i][1];
+        }
+        var myApp = this;
+        this.sendClueRequest(data, function(json) {
+            myApp.setState({'session': json.session, 'history': []});
+            myApp.updateCardInfo(json.session, false);
+        }, function(errorText) {
+            alert('Error: ' + errorText);
+        });
+    },
+
     render() {
         return (
             <div>
