@@ -27,10 +27,15 @@ function categoryFromInternalCard(card: string) {
   }
   return 10;
 }
-const CARD_TYPE_NAMES = ["Suspects", "Weapons", "Rooms"];
-interface CardName {
+interface CardIndex {
     card_type: number,
-    index: number,
+    index: number
+}
+//TODO - make this an enum
+const CARD_TYPE_NAMES = ["Suspects", "Weapons", "Rooms"];
+//TODO - use CardIndex
+interface CardName {
+    card_index: CardIndex,
     internal: string,
     external: string
 }
@@ -38,7 +43,8 @@ let CARD_NAMES : Array<Array<CardName>> = [];
 for (let i = 0; i < _INTERNAL_NAMES.length; ++i) {
   CARD_NAMES.push([]);
   for (let j = 0; j < _INTERNAL_NAMES[i].length; ++j) {
-      CARD_NAMES[i].push({'card_type': i, 'index': j, 'internal': _INTERNAL_NAMES[i][j], 'external': _EXTERNAL_NAMES[i][j]});
+      let card_index: CardIndex = { card_type: i, index: j };
+      CARD_NAMES[i].push({card_index: card_index, internal: _INTERNAL_NAMES[i][j], external: _EXTERNAL_NAMES[i][j]});
   }
 }
 
@@ -204,48 +210,132 @@ class GameSetup extends Component<GameSetupProps, GameSetupState> {
     }
 }
 
-class App extends Component {
-  render() {
-    return (
-        <div>
-            <Tabs>
-                <TabList>
-                    <Tab>Game setup</Tab>
-                    <Tab>Game info</Tab>
-                    <Tab>Undo and history</Tab>
-                    <Tab>Simulation</Tab>
-                </TabList>
-                <TabPanel>
-                    <div>Setup</div>
-                </TabPanel>
-                <TabPanel>
-                    <div>Info</div>
-                </TabPanel>
-                <TabPanel>
-                    <div>History</div>
-                </TabPanel>
-                <TabPanel>
-                    <div>Simulation</div>
-                </TabPanel>
-            </Tabs>
-        </div>
-      //<div className="App">
-      //  <header className="App-header">
-      //    <p>
-      //      Edit <code>src/App.tsx</code> and save to reload.
-      //    </p>
-      //    <a
-      //      className="App-link"
-      //      href="https://reactjs.org"
-      //      target="_blank"
-      //      rel="noopener noreferrer"
-      //    >
-      //      Learn React
-      //    </a>
-      //  </header>
-      //</div>
-    );
-  }
+interface CardInfo {
+    card_type: number,
+    index: number,
+    state: CardState,
+    owners: Array<number>
+}
+
+interface HistorySuggestion {
+    history_type: "suggestion",
+    suggester_index: number,
+    suspect_index: number,
+    weapon_index: number,
+    room_index: number,
+    refuter_index: number,
+    refuted_card_index: CardIndex | null
+}
+
+interface HistoryWhoOwns {
+    history_type: "whoOwns",
+    player_index: number,
+    card_index: CardIndex
+}
+
+type HistoryEvent = HistorySuggestion | HistoryWhoOwns;
+interface HistoryEntry {
+    event: HistoryEvent,
+    //TODO -describe
+    session: string,
+}
+
+type SimulationData = Map<CardIndex, Array<number>>;
+
+interface AppState {
+    playerInfos: Array<PlayerInfo>,
+    cardInfos: Array<Array<CardInfo>>,
+    isConsistent: boolean,
+    haveEnteredData: boolean,
+    clauseInfo: Map<number, Array<Array<CardIndex>>>,
+    history: Array<HistoryEntry>,
+    working: boolean,
+    simData: SimulationData,
+    doingSimulation: boolean,
+    numberOfSimulations: number,
+    session: string
+}
+
+class App extends Component<{}, AppState> {
+    constructor() {
+        // TODO - is this super() call right?
+        super({});
+        // TODO - parse query hash from window.location.hash?
+        let playerInfos: Array<PlayerInfo> = [];
+        for (let i = 1; i <= MAX_PLAYERS; ++i) {
+            playerInfos.push({ name: 'Player ' + i, numberOfCards: DEFAULT_CARDS});
+        }
+        let cardInfos : Array<Array<CardInfo>> = [];
+        for (let i = 0; i < CARD_NAMES.length; ++i) {
+            cardInfos.push([]);
+            for (let j = 0; j < CARD_NAMES[i].length; ++j) {
+                cardInfos[i].push({'card_type': i, 'index': j, 'state': CardState.Unknown, 'owners': []});
+            }
+        }
+
+        this.state = {
+            playerInfos: playerInfos,
+            cardInfos: cardInfos,
+            isConsistent: true,
+            haveEnteredData: false,
+            clauseInfo: new Map<number, Array<Array<CardIndex>>>(),
+            history: [],
+            working: false,
+            simData: new Map<CardIndex, Array<number>>(),
+            doingSimulation: false,
+            numberOfSimulations: -1
+        };
+
+    }
+    render() {
+        return (
+            <div>
+                <Tabs>
+                    <TabList>
+                        <Tab>Game setup</Tab>
+                        <Tab>Game info</Tab>
+                        <Tab>Undo and history</Tab>
+                        <Tab>Simulation</Tab>
+                    </TabList>
+                    <TabPanel>
+                        <GameSetup
+                            playerInfos={this.state.playerInfos}
+                            setNumberOfPlayers={this.setNumberOfPlayers}
+                            setNumberOfCards={this.setNumberOfCards}
+                            setPlayerName={this.setPlayerName}
+                            session={this.state.session}
+                            haveEnteredData={this.state.haveEnteredData}
+                            setGameString={this.setGameString}
+                            newSession={this.newSession} />
+                    </TabPanel>
+                    <TabPanel>
+                        <div>Info</div>
+                    </TabPanel>
+                    <TabPanel>
+                        <div>History</div>
+                    </TabPanel>
+                    <TabPanel>
+                        <div>Simulation</div>
+                    </TabPanel>
+                </Tabs>
+            </div>
+          //<div className="App">
+          //  <header className="App-header">
+          //    <p>
+          //      Edit <code>src/App.tsx</code> and save to reload.
+          //    </p>
+          //    <a
+          //      className="App-link"
+          //      href="https://reactjs.org"
+          //      target="_blank"
+          //      rel="noopener noreferrer"
+          //    >
+          //      Learn React
+          //    </a>
+          //  </header>
+          //</div>
+        );
+    }
 }
 
 export default App;
