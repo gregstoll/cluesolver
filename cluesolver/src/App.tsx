@@ -294,7 +294,6 @@ class App extends Component<{}, AppState> {
         if (!skipWorking) {
             this.setState({working: true});
         }
-        //TODO - does this work?
         let url = SCRIPT_NAME;
         if (!isNullOrUndefined(data) && data != "") {
             url += "?" + data;
