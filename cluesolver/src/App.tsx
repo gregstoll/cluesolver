@@ -2,8 +2,10 @@ import React, { Component, ChangeEvent } from 'react';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import "react-tabs/style/react-tabs.css";
 import './App.css';
+import { isNullOrUndefined } from 'util';
 
-const SCRIPT_NAME = "clue.cgi";
+//TODO - for dev only
+const SCRIPT_NAME = "https://gregstoll.dyndns.org/cluesolver/clue.cgi";
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 6;
 const MIN_CARDS = 3;
@@ -20,7 +22,7 @@ function compareInternalCardsByCategory(card1: string, card2: string) {
   return categoryFromInternalCard(card1) - categoryFromInternalCard(card2);
 }
 function categoryFromInternalCard(card: string) {
-  for (var i = 0; i < _INTERNAL_NAMES.length; ++i) {
+  for (let i = 0; i < _INTERNAL_NAMES.length; ++i) {
       if (_INTERNAL_NAMES[i].indexOf(card) != -1) {
           return i;
       }
@@ -62,11 +64,11 @@ interface NumberOfPlayerOptionProps {
 }
 
 class NumberOfPlayerOption extends Component<NumberOfPlayerOptionProps, {}> {
-    handleChange() {
+    handleChange = () => {
         this.props.setNumberOfPlayers(this.props.thisNumberOfPlayers);
     }
-    render() {
-        var id = "numberOfPlayersInput" + this.props.thisNumberOfPlayers;
+    render = () => {
+        let id = "numberOfPlayersInput" + this.props.thisNumberOfPlayers;
         return <span><input type="radio" name="numberOfPlayer" id={id} value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange} disabled={!this.props.allowChange}/><label htmlFor={id}> {this.props.thisNumberOfPlayers}</label></span>;
     }
 }
@@ -83,9 +85,9 @@ interface NumberOfPlayersProps {
 }
 
 class NumberOfPlayers extends Component<NumberOfPlayersProps, {}> {
-    render() {
-        var options = [];
-        for (var i = MIN_PLAYERS; i <= MAX_PLAYERS; ++i) {
+    render = () => {
+        let options = [];
+        for (let i = MIN_PLAYERS; i <= MAX_PLAYERS; ++i) {
             options.push(<NumberOfPlayerOption thisNumberOfPlayers={i} numberOfPlayers={this.props.playerInfos.length} key={i} setNumberOfPlayers={this.props.setNumberOfPlayers} allowChange={this.props.allowChange}/>);
         }
         return <div><span>Number of players:</span><form style={{display: 'inline'}}>{options}</form></div>;
@@ -99,12 +101,12 @@ interface PlayerNumberOfCardsProps {
 }
 
 class PlayerNumberOfCards extends Component<PlayerNumberOfCardsProps, {}> {
-    handleChange(e: ChangeEvent<HTMLSelectElement>) {
+    handleChange = (e: ChangeEvent<HTMLSelectElement>) => {
         this.props.setNumberOfCards(parseInt(e.target.value, 10));
     }
-    render() {
-        var options = [];
-        for (var i = MIN_CARDS; i <= MAX_CARDS; i++) {
+    render = () => {
+        let options = [];
+        for (let i = MIN_CARDS; i <= MAX_CARDS; i++) {
             options.push(<option value={i} key={i}>{i}</option>);
         }
         return <select onChange={this.handleChange} disabled={!this.props.allowChange} value={this.props.num}>{options}</select>;
@@ -120,13 +122,13 @@ interface PlayerInfoComponentProps {
 }
 
 class PlayerInfoComponent extends Component<PlayerInfoComponentProps, {}> {
-    setNumberOfCards(numberOfCards: number) {
+    setNumberOfCards = (numberOfCards: number) => {
         this.props.setNumberOfCards(this.props.index, numberOfCards);
     }
-    setPlayerName(e: ChangeEvent<HTMLInputElement>) {
+    setPlayerName = (e: ChangeEvent<HTMLInputElement>) => {
         this.props.setPlayerName(this.props.index, e.target.value);
     }
-    render() {
+    render = () => {
         return <div>Name:<input type="text" value={this.props.info.name} onChange={this.setPlayerName} /> Number of cards:<PlayerNumberOfCards num={this.props.info.numberOfCards} setNumberOfCards={this.setNumberOfCards} allowChange={this.props.allowChange} /></div>;
     }
 }
@@ -139,7 +141,7 @@ interface PlayerListProps {
 }
 
 class PlayerList extends Component<PlayerListProps, {}> {
-    render() {
+    render = () => {
         let infos = [];
         for (let i = 0; i < this.props.playerInfo.length; ++i) {
             infos.push(<PlayerInfoComponent index={i} key={i} info={this.props.playerInfo[i]} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName} allowChange={this.props.allowChange}/>);
@@ -153,12 +155,12 @@ interface NumberOfCardsValidatorProps {
 }
 
 class NumberOfCardsValidator extends Component<NumberOfCardsValidatorProps, {}> {
-    render() {
+    render = () => {
         // TODO - do this better?
-        var totalNumberOfCards = this.props.playerInfo.reduce(function (previousValue, currentValue) {
+        let totalNumberOfCards = this.props.playerInfo.reduce(function (previousValue, currentValue) {
             return previousValue + currentValue.numberOfCards;
         }, 0);
-        var badNumberOfCardsElem = null;
+        let badNumberOfCardsElem = null;
         if (totalNumberOfCards != TOTAL_CARDS_FOR_PLAYERS) {
             badNumberOfCardsElem = <span className="warning">Total number of cards must total {TOTAL_CARDS_FOR_PLAYERS}! (not {totalNumberOfCards})</span>;
         }
@@ -188,16 +190,16 @@ class GameSetup extends Component<GameSetupProps, GameSetupState> {
             loadGameString: ""
         }
     }
-    handleRestartGame() {
+    handleRestartGame = () => {
         this.props.newSession();
     }
-    handleLoadGameStringChange(e: ChangeEvent<HTMLInputElement>) {
+    handleLoadGameStringChange = (e: ChangeEvent<HTMLInputElement>) => {
         this.setState({loadGameString: e.target.value});
     }
-    handleSetLoadGameString() {
+    handleSetLoadGameString = () => {
         this.props.setGameString(this.state.loadGameString);
     }
-    render() {
+    render = () => {
         return <div>
             <NumberOfPlayers playerInfos={this.props.playerInfos} setNumberOfPlayers={this.props.setNumberOfPlayers} allowChange={!this.props.haveEnteredData}/>
             <PlayerList playerInfo={this.props.playerInfos} setNumberOfCards={this.props.setNumberOfCards} setPlayerName={this.props.setPlayerName} allowChange={!this.props.haveEnteredData}/>
@@ -257,9 +259,9 @@ interface AppState {
 }
 
 class App extends Component<{}, AppState> {
-    constructor() {
+    constructor(props: {}) {
         // TODO - is this super() call right?
-        super({});
+        super(props);
         // TODO - parse query hash from window.location.hash?
         let playerInfos: Array<PlayerInfo> = [];
         for (let i = 1; i <= MAX_PLAYERS; ++i) {
@@ -287,43 +289,181 @@ class App extends Component<{}, AppState> {
             session: null
         };
     }
-    sendClueRequest(data, successCallback, failureCallback, skipWorking) {
+    //TODO could be async
+    sendClueRequest = (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => {
         if (!skipWorking) {
             this.setState({working: true});
         }
-        var that = this;
         //TODO - does this work?
-        $.ajax({url: SCRIPT_NAME, data: data, dataType: "json", complete: function(xhr, textStatus) {
-            if (!skipWorking) {
-                that.setState({working: false});
+        let url = SCRIPT_NAME;
+        if (!isNullOrUndefined(data) && data != "") {
+            url += "?" + data;
+        }
+        let promise = fetch(url);
+        promise
+            .then(response => {
+                if (!response.ok) {
+                    failureCallback("Error doing request: " + response.statusText);
+                    return;
+                }
+                response.json().then(data => {
+                    successCallback(data);
+                });
+            })
+            .catch(error => {
+                failureCallback(error.message);
+            })
+            .finally(() => {
+                if (!skipWorking) {
+                    this.setState({working: false});
+                }
+            });
+    }
+    internalSetNumberOfPlayers = (previousPlayerInfo: Array<PlayerInfo>, numberOfPlayers: number) => {
+        let playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
+        if (playerInfo.length == numberOfPlayers) {
+            return playerInfo;
+        }
+        if (playerInfo.length > numberOfPlayers) {
+            playerInfo = playerInfo.slice(0, numberOfPlayers);
+        }
+        else {
+            while (playerInfo.length < numberOfPlayers) {
+                // use DEFAULT_CARDS here, will fix afterwards
+                playerInfo.push({ name: 'Player ' + (playerInfo.length + 1), numberOfCards: DEFAULT_CARDS });
             }
-            if (textStatus != "success" && textStatus != "notmodified") {
-                failureCallback('from jQuery: ' + textStatus);
-                return;
+        }
+        const baseCards = Math.floor(TOTAL_CARDS_FOR_PLAYERS / numberOfPlayers);
+        const numWhoGetExtra = (TOTAL_CARDS_FOR_PLAYERS - baseCards * numberOfPlayers) % numberOfPlayers;
+        for (let i = 0; i < playerInfo.length; ++i) {
+            let numCards = baseCards;
+            if (i < numWhoGetExtra) {
+                numCards++;
             }
-            if (xhr.responseJSON.errorStatus != 0) {
-                failureCallback(xhr.responseJSON.errorText);
-                return;
-            }
-            successCallback(xhr.responseJSON);
-        }});
+            playerInfo[i].numberOfCards = numCards;
+        }
+        return playerInfo;
     }
 
-    newSession() {
-        var data = "action=new&players=" + this.state.playerInfos.length;
-        for (var i = 0; i < this.state.playerInfos.length; ++i) {
-            data += "&numCards" + i + "=" + this.state.playerInfos[i][1];
+    cardIndexFromInternalName = (name: string) : CardIndex => {
+        // TODO - optimize this
+        for (let i = 0; i < CARD_NAMES.length; ++i) {
+            for (let j = 0; j < CARD_NAMES[i].length; ++j) {
+                if (CARD_NAMES[i][j].internal === name) {
+                    return { card_type: i, index: j };
+                }
+            }
         }
-        var myApp = this;
+        return { card_type: -1, index: -1 };
+    }
+
+    updateInfoFromJson = (json: any, haveEnteredData: boolean) => {
+        let playerInfos = this.state.playerInfos;
+        if (json.numPlayers) {
+            playerInfos = this.internalSetNumberOfPlayers(this.state.playerInfos, json.numPlayers);
+            for (let i = 0; i < json.numPlayers; ++i) {
+                playerInfos[i].numberOfCards = json.numCards[i];
+            }
+        }
+        let totalCards = playerInfos.reduce(function (previousValue: number, currentValue) {
+            return previousValue + currentValue.numberOfCards;
+        }, 0);
+
+        let jsonClauseInfo = json.clauseInfo;
+        let clauseInfo = new Map<number, Array<Array<CardIndex>>>();
+        if (jsonClauseInfo) {
+            for (let playerIndex in jsonClauseInfo) {
+                //TODO - is this casting right?
+                let playerIndexNumber: number = (playerIndex as unknown) as number;
+                let newClauses : Array<Array<CardIndex>>= [];
+                for (let i = 0; i < jsonClauseInfo[playerIndex].length; ++i) {
+                    let clause : Array<CardIndex> = [];
+                    for (let j = 0; j < jsonClauseInfo[playerIndex][i].length; ++j) {
+                        clause.push(this.cardIndexFromInternalName(jsonClauseInfo[playerIndex][i][j]));
+                    }
+                    newClauses.push(clause);
+                }
+                clauseInfo.set(playerIndexNumber, newClauses);
+            }
+        }
+        let newInfo = json.newInfo;
+        //let newCardInfo = $.extend(true, {}, this.state.cardInfo);
+        let newCardInfos = this.state.cardInfos;
+        for (let i = 0; i < newInfo.length; ++i) {
+            let cardIndex = this.cardIndexFromInternalName(newInfo[i].card);
+            newCardInfos[cardIndex.card_type][cardIndex.index].state = newInfo[i].status;
+            newCardInfos[cardIndex.card_type][cardIndex.index].owners = newInfo[i].owner;
+        }
+        this.setState({
+            cardInfos: newCardInfos,
+            playerInfos: playerInfos,
+            session: json.session,
+            clauseInfo: clauseInfo,
+            isConsistent: json.isConsistent && totalCards == TOTAL_CARDS_FOR_PLAYERS,
+            haveEnteredData: haveEnteredData
+        });
+    }
+
+    updateCardInfo = (session: string, haveEnteredData: boolean, callback?: () => void) => {
+        const data = "sess=" + session + "&action=fullInfo";
+        let myApp = this;
+        this.sendClueRequest(data, function(json) {
+            if (callback) {
+                callback();
+            }
+            myApp.updateInfoFromJson(json, haveEnteredData);
+        }, function(errorText) {
+            alert('Error: ' + errorText);
+        });
+    }
+
+    newSession = () => {
+        let data = "action=new&players=" + this.state.playerInfos.length;
+        for (let i = 0; i < this.state.playerInfos.length; ++i) {
+            data += "&numCards" + i + "=" + this.state.playerInfos[i].numberOfCards;
+        }
+        let myApp = this;
         this.sendClueRequest(data, function(json) {
             myApp.setState({'session': json.session, 'history': []});
             myApp.updateCardInfo(json.session, false);
         }, function(errorText) {
             alert('Error: ' + errorText);
         });
-    },
+    }
+    setNumberOfCards = (playerIndex: number, numberOfCards: number) => {
+        let that = this;
+        this.setState((previousState, currentProps) => {
+            let playerInfos = previousState.playerInfos.slice(0, previousState.playerInfos.length);
+            playerInfos[playerIndex].numberOfCards = numberOfCards;
+            return { playerInfos: playerInfos };
+        }, () => {
+            // TODO - should be using a componentDidUpdate() callback instead? see https://reactjs.org/docs/react-component.html#setstate
+            that.newSession();
+        });
+    }
 
-    render() {
+    setNumberOfPlayers = (numberOfPlayers: number) => {
+        let that = this;
+        this.setState((previousState, currentProps) => {
+            return {playerInfos: this.internalSetNumberOfPlayers(previousState.playerInfos, numberOfPlayers)};
+        }, () => {
+            // TODO - should be using a componentDidUpdate() callback instead? see https://reactjs.org/docs/react-component.html#setstate
+            that.newSession();
+        });
+    }
+    setPlayerName = (playerIndex: number, playerName: string) => {
+        this.setState((previousState, currentProps) => {
+            let playerInfos = previousState.playerInfos.slice(0, previousState.playerInfos.length);
+            playerInfos[playerIndex].name = playerName;
+            return {playerInfos: playerInfos};
+        });
+    }
+    setGameString = (s: string) => {
+        this.setState({session: s});
+        this.updateCardInfo(s, true);
+    }
+
+    render = () => {
         return (
             <div>
                 <Tabs>
