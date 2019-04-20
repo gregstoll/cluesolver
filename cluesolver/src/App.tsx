@@ -219,6 +219,71 @@ interface CardInfo {
     owners: Array<number>
 }
 
+interface SpecificCardInfoProps {
+    //TODO - rename to cardInfo
+    info: CardInfo,
+    playerInfos: Array<PlayerInfo>
+}
+
+class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
+    getImgSrc = () => {
+        let name : string;
+        switch (this.props.info.state) {
+            case CardState.OwnedByPlayer:
+                name = 'cancel.png';
+                break;
+            case CardState.OwnedByCasefile:
+                name = 'accept.png';
+                break;
+            case CardState.Unknown:
+            default:
+                name = 'help.png';
+                break;
+        }
+        return 'images/' + name;
+    }
+    getOwnedByString = () => {
+        if (this.props.info.owners && !(this.props.info.owners.length  > 0)) {
+            return "???";
+        }
+        var s = "";
+        for (var i = 0; i < this.props.info.owners.length; ++i) {
+            var curIndex = this.props.info.owners[i];
+            if (curIndex == this.props.playerInfos.length) {
+                s += "(solution)";
+            }
+            else {
+                s += this.props.playerInfos[curIndex].name;
+            }
+            if (i < this.props.info.owners.length - 1) {
+                s += " or ";
+            }
+        }
+        return s;
+    }
+    getAltText = () => {
+        switch (this.props.info.state) {
+            case CardState.OwnedByPlayer:
+              return "Owned by " + this.getOwnedByString();
+              break;
+            case CardState.OwnedByCasefile:
+              return "Solution!";
+              break;
+            case CardState.Unknown:
+            default:
+              if (this.props.info.owners && this.props.info.owners.length > 0) {
+                  return "Owned by " + this.getOwnedByString();
+              } else {
+                  return "Unknown";
+              }
+              break;
+        }
+    }
+    render = () => {
+        return <tr><td style={{paddingLeft: 20, textAlign: 'left'}}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td><td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()}/></td></tr>;
+    }
+}
+
 interface HistorySuggestion {
     history_type: "suggestion",
     suggester_index: number,
