@@ -307,6 +307,9 @@ class App extends Component<{}, AppState> {
                 }
                 response.json().then(data => {
                     successCallback(data);
+                })
+                .catch(error => {
+                    failureCallback("Error getting JSON from request: " + error.toString())
                 });
             })
             .catch(error => {
