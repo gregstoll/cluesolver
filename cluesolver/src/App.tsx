@@ -465,6 +465,10 @@ class App extends Component<{}, AppState> {
         this.updateCardInfo(s, true);
     }
 
+    componentDidMount = () => {
+        this.newSession();
+    }
+
     render = () => {
         return (
             <div>
