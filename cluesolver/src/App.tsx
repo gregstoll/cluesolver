@@ -331,6 +331,79 @@ class WhoOwnsACard extends React.Component<WhoOwnsACardProps, WhoOwnsACardState>
     }
 }
 
+interface SuggestACardState {
+    suggestingPlayerIndex: number,
+    refutingPlayerIndex: number,
+    // First entry of this is the index of the suspect card
+    // Second entry of this is the index of the weapon card
+    // Third entry of this is the index of the room card
+    cardIndices: Array<number>,
+    refutingCardIndex: CardIndex
+}
+class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState> {
+    constructor(props: WhoOwnsACardProps) {
+        super(props);
+        this.state = { suggestingPlayerIndex: 0, refutingPlayerIndex: -1, cardIndices: [0, 0, 0], refutingCardIndex: { card_type: -1, index: -1 } };
+    }
+    setSuggestingPlayerIndex = (playerIndex: number) => {
+        this.setState({suggestingPlayerIndex: playerIndex});
+    }
+    setRefutingPlayerIndex = (playerIndex: number) => {
+        this.setState({refutingPlayerIndex: playerIndex});
+    }
+    setRefutingCardIndex = (cardIndex: CardIndex) => {
+        this.setState({refutingCardIndex: cardIndex});
+    }
+    setCardIndex = (cardIndex: CardIndex) => {
+        // TODO - need to copy?
+        var newCardIndices = this.state.cardIndices;
+        newCardIndices[cardIndex.card_type] = cardIndex.index;
+        this.setState({cardIndices: newCardIndices});
+    }
+    sendSuggestion = () => {
+        let data = "sess=" + this.props.session + "&action=suggestion&suggestingPlayer=" + this.state.suggestingPlayerIndex;
+        for (var i = 0; i < CARD_TYPE_NAMES.length; ++i) {
+            data += "&card" + (i+1) + "=" + CARD_NAMES[i][this.state.cardIndices[i]].internal;
+        }
+        data += "&refutingPlayer=" + this.state.refutingPlayerIndex + "&refutingCard=";
+        //TODO - none check
+        if (this.state.refutingCardIndex.card_type == -1 && this.state.refutingCardIndex.index == -1) {
+            data += "None";
+        }
+        else {
+            data += CARD_NAMES[this.state.refutingCardIndex.card_type][this.state.refutingCardIndex.index].internal;
+        }
+        const description : HistorySuggestion = {
+            history_type: "suggestion",
+            suggester_index: this.state.suggestingPlayerIndex,
+            suspect_index: this.state.cardIndices[0],
+            weapon_index: this.state.cardIndices[1],
+            room_index: this.state.cardIndices[2],
+            refuter_index: this.state.refutingPlayerIndex,
+            refuted_card_index: this.state.refutingCardIndex
+        };
+        var that = this;
+        this.props.sendClueRequest(data, function(json) {
+            that.props.addToHistory(description);
+            that.props.updateInfoFromJson(json, true);
+        }, function(errorText) {
+            alert('Error: ' + errorText);
+        });
+    }
+    render = () => {
+        // TODO - hide suggesting player in refuting player box?
+        return <div>
+            <div><PlayerSelector label="Made by" includeSolution={false} playerInfos={this.props.playerInfos} playerIndex={this.state.suggestingPlayerIndex} setPlayerIndex={this.setSuggestingPlayerIndex} /></div>
+            <div><CardSelector cardType={0} cardIndex={{ card_type: 0, index: this.state.cardIndices[0] }} setCardIndex={this.setCardIndex} /></div>
+            <div><CardSelector cardType={1} cardIndex={{ card_type: 1, index: this.state.cardIndices[1] }} setCardIndex={this.setCardIndex}/></div>
+            <div><CardSelector cardType={2} cardIndex={{ card_type: 2, index: this.state.cardIndices[2] }} setCardIndex={this.setCardIndex}/></div>
+            <div><PlayerSelector label="Refuted by" includeSolution={false} includeNone={true} playerInfos={this.props.playerInfos} playerIndex={this.state.refutingPlayerIndex} setPlayerIndex={this.setRefutingPlayerIndex}/></div>
+            <div><RefutingCardSelector cardIndex={this.state.refutingCardIndex} cardIndices={this.state.cardIndices} setCardIndex={this.setRefutingCardIndex} /></div>
+            <button type="button" onClick={this.sendSuggestion}>Add info</button>
+        </div>;
+    }
+}
+
 interface CardSelectorProps {
     cardType: number,
     cardIndex: CardIndex,
@@ -357,10 +430,51 @@ class CardSelector extends React.Component<CardSelectorProps, {}> {
     }
 }
 
+interface RefutingCardSelectorProps {
+    cardIndex: CardIndex,
+    // First entry of this is the index of the suspect card
+    // Second entry of this is the index of the weapon card
+    // Third entry of this is the index of the room card
+    cardIndices: Array<number>,
+    setCardIndex: (newCardIndex: CardIndex) => void
+}
+
+class RefutingCardSelector extends React.Component<RefutingCardSelectorProps, {}> {
+    handleChange = (e: ChangeEvent<HTMLSelectElement>) => {
+        let cardIndexParts: Array<number> = e.target.value.split(" ").map((x: string) => parseInt(x, 10));
+        this.props.setCardIndex({ card_type: cardIndexParts[0], index: cardIndexParts[1] });
+    }
+    render = () => {
+        let options = [];
+        let invalidSelectedCard = true;
+        //TODO - use a constant for this "-1 -1" stuff (and similar CardIndex)
+        options.push(<option value="-1 -1" key="-1">None/Unknown</option>);
+        let selectedCardIndexString = this.props.cardIndex.card_type + ' ' + this.props.cardIndex.index;
+        if (selectedCardIndexString == "-1 -1") {
+            invalidSelectedCard = false;
+        }
+        for (let i = 0; i < this.props.cardIndices.length; ++i) {
+            let cardInfo = CARD_NAMES[i][this.props.cardIndices[i]];
+            //TODO - should really have a method for this
+            let cardIndexString = cardInfo.card_index.card_type + ' ' + cardInfo.card_index.index;
+            if (selectedCardIndexString == cardIndexString) {
+                invalidSelectedCard = false;
+            }
+            options.push(<option value={cardIndexString} key={cardInfo.card_index.card_type}>{cardInfo.external}</option>);
+        }
+        if (invalidSelectedCard) {
+            // this happens if there's a selected refuting card, and then
+            // the choices change so this isn't an option anymore
+            this.props.setCardIndex({ card_type: -1, index: -1 });
+        }
+        return <span>Refuting card: <select value={selectedCardIndexString} onChange={this.handleChange}>{options}</select></span>;
+    }
+}
+
 interface PlayerSelectorProps {
     label: string,
     includeSolution: boolean,
-    includeNone: boolean,
+    includeNone?: boolean,
     playerInfos: Array<PlayerInfo>,
     playerIndex: number,
     setPlayerIndex: (playerIndex: number) => void
