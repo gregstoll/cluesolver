@@ -294,11 +294,11 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
 interface GameInfoProps {
     playerInfos: Array<PlayerInfo>,
     cardInfos: Array<Array<CardInfo>>,
-    session: string,
+    session: string | null,
     isConsistent: boolean,
     clauseInfos: ClauseInfoMap,
     updateInfoFromJson: (json: any, haveEnteredData: boolean) => void,
-    addToHistory: (entry: HistoryEvent) => void,
+    addToHistory: (historyEvent: HistoryEvent) => void,
     sendClueRequest: (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => void
 }
 
@@ -358,9 +358,9 @@ class ClauseInfo extends React.Component<ClauseInfoProps, {}> {
 
 interface WhoOwnsACardProps {
     playerInfos: Array<PlayerInfo>,
-    session: string,
+    session: string | null,
     updateInfoFromJson: (json: any, haveEnteredData: boolean) => void,
-    addToHistory: (entry: HistoryEvent) => void,
+    addToHistory: (historyEvent: HistoryEvent) => void,
     sendClueRequest: (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => void
 }
 interface WhoOwnsACardState {
@@ -597,7 +597,7 @@ interface AppState {
     cardInfos: Array<Array<CardInfo>>,
     isConsistent: boolean,
     haveEnteredData: boolean,
-    clauseInfo: Map<number, Array<Array<CardIndex>>>,
+    clauseInfos: Map<number, Array<Array<CardIndex>>>,
     history: Array<HistoryEntry>,
     working: boolean,
     simData: SimulationData,
@@ -628,7 +628,7 @@ class App extends Component<{}, AppState> {
             cardInfos: cardInfos,
             isConsistent: true,
             haveEnteredData: false,
-            clauseInfo: new Map<number, Array<Array<CardIndex>>>(),
+            clauseInfos: new Map<number, Array<Array<CardIndex>>>(),
             history: [],
             working: false,
             simData: new Map<CardIndex, Array<number>>(),
@@ -720,7 +720,7 @@ class App extends Component<{}, AppState> {
         }, 0);
 
         let jsonClauseInfo = json.clauseInfo;
-        let clauseInfo = new Map<number, Array<Array<CardIndex>>>();
+        let clauseInfos = new Map<number, Array<Array<CardIndex>>>();
         if (jsonClauseInfo) {
             for (let playerIndex in jsonClauseInfo) {
                 //TODO - is this casting right?
@@ -733,7 +733,7 @@ class App extends Component<{}, AppState> {
                     }
                     newClauses.push(clause);
                 }
-                clauseInfo.set(playerIndexNumber, newClauses);
+                clauseInfos.set(playerIndexNumber, newClauses);
             }
         }
         let newInfo = json.newInfo;
@@ -748,7 +748,7 @@ class App extends Component<{}, AppState> {
             cardInfos: newCardInfos,
             playerInfos: playerInfos,
             session: json.session,
-            clauseInfo: clauseInfo,
+            clauseInfos: clauseInfos,
             isConsistent: json.isConsistent && totalCards == TOTAL_CARDS_FOR_PLAYERS,
             haveEnteredData: haveEnteredData
         });
@@ -813,6 +813,16 @@ class App extends Component<{}, AppState> {
         this.updateCardInfo(s, true);
     }
 
+    addToHistory = (historyEvent: HistoryEvent) => {
+        //TODO - assert this is non-null?
+        let session = this.state.session!;
+        this.setState(function(previousState, currentProps) {
+            let history = previousState.history;
+            history.push({ event: historyEvent, session: session });
+            return {'history': history};
+        });
+    }
+
     componentDidMount = () => {
         this.newSession();
     }
@@ -839,7 +849,15 @@ class App extends Component<{}, AppState> {
                             newSession={this.newSession} />
                     </TabPanel>
                     <TabPanel>
-                        <div>Info</div>
+                        <GameInfo
+                            playerInfos={this.state.playerInfos}
+                            cardInfos={this.state.cardInfos}
+                            session={this.state.session}
+                            isConsistent={this.state.isConsistent}
+                            clauseInfos={this.state.clauseInfos}
+                            updateInfoFromJson={this.updateInfoFromJson}
+                            addToHistory={this.addToHistory}
+                            sendClueRequest={this.sendClueRequest} />
                     </TabPanel>
                     <TabPanel>
                         <div>History</div>
