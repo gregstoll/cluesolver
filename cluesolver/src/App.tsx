@@ -250,9 +250,9 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
         if (this.props.info.owners && !(this.props.info.owners.length  > 0)) {
             return "???";
         }
-        var s = "";
-        for (var i = 0; i < this.props.info.owners.length; ++i) {
-            var curIndex = this.props.info.owners[i];
+        let s = "";
+        for (let i = 0; i < this.props.info.owners.length; ++i) {
+            let curIndex = this.props.info.owners[i];
             if (curIndex == this.props.playerInfos.length) {
                 s += "(solution)";
             }
@@ -424,13 +424,13 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
     }
     setCardIndex = (cardIndex: CardIndex) => {
         // TODO - need to copy?
-        var newCardIndices = this.state.cardIndices;
+        let newCardIndices = this.state.cardIndices;
         newCardIndices[cardIndex.card_type] = cardIndex.index;
         this.setState({cardIndices: newCardIndices});
     }
     sendSuggestion = () => {
         let data = "sess=" + this.props.session + "&action=suggestion&suggestingPlayer=" + this.state.suggestingPlayerIndex;
-        for (var i = 0; i < CARD_TYPE_NAMES.length; ++i) {
+        for (let i = 0; i < CARD_TYPE_NAMES.length; ++i) {
             data += "&card" + (i+1) + "=" + CARD_NAMES[i][this.state.cardIndices[i]].internal;
         }
         data += "&refutingPlayer=" + this.state.refutingPlayerIndex + "&refutingCard=";
@@ -450,7 +450,7 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
             refuter_index: this.state.refutingPlayerIndex,
             refuted_card_index: this.state.refutingCardIndex
         };
-        var that = this;
+        let that = this;
         this.props.sendClueRequest(data, function(json) {
             that.props.addToHistory(description);
             that.props.updateInfoFromJson(json, true);
