@@ -41,6 +41,7 @@ interface CardName {
     internal: string,
     external: string
 }
+//TODO - refactor this into a method that takes a CardIndex or something
 let CARD_NAMES : Array<Array<CardName>> = [];
 for (let i = 0; i < _INTERNAL_NAMES.length; ++i) {
   CARD_NAMES.push([]);
@@ -280,7 +281,107 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
         }
     }
     render = () => {
-        return <tr><td style={{paddingLeft: 20, textAlign: 'left'}}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td><td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()}/></td></tr>;
+        return <tr>
+            <td style={{ paddingLeft: 20, textAlign: 'left' }}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td>
+            <td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()} /></td>
+        </tr>;
+    }
+}
+
+interface WhoOwnsACardProps {
+    playerInfos: Array<PlayerInfo>,
+    session: string,
+    updateInfoFromJson: (json: any, haveEnteredData: boolean) => void,
+    addToHistory: (entry: HistoryEvent) => void,
+    sendClueRequest: (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => void
+}
+interface WhoOwnsACardState {
+    cardIndex: CardIndex,
+    playerIndex: number
+}
+
+class WhoOwnsACard extends React.Component<WhoOwnsACardProps, WhoOwnsACardState> {
+    constructor(props: WhoOwnsACardProps) {
+        super(props);
+        this.state = { cardIndex: { card_type: 0, index: 0 }, playerIndex: 0 };
+    }
+    setCardIndex = (newCardIndex: CardIndex) => {
+        this.setState({cardIndex: newCardIndex});
+    }
+    setPlayerIndex = (newPlayerIndex: number) => {
+        this.setState({playerIndex: newPlayerIndex});
+    }
+    sendWhoOwnsACard = () => {
+        let data = "sess=" + this.props.session + "&action=whoOwns&owner=" + this.state.playerIndex + "&card=" + CARD_NAMES[this.state.cardIndex.card_type][this.state.cardIndex.index].internal;
+        let description: HistoryWhoOwns = {history_type: 'whoOwns', player_index: this.state.playerIndex, card_index: this.state.cardIndex};
+        let that = this;
+        this.props.sendClueRequest(data, (json: any) => {
+            that.props.addToHistory(description);
+            that.props.updateInfoFromJson(json, true);
+        }, (message: string) => {
+            alert('Error: ' + message);
+        });
+    }
+    render = () => {
+        return <div>
+            <div><CardSelector cardType={-1} cardIndex={this.state.cardIndex} setCardIndex={this.setCardIndex}/></div>
+            <div><PlayerSelector label="Owned by" includeSolution={true} includeNone={false} playerInfos={this.props.playerInfos} playerIndex={this.state.playerIndex} setPlayerIndex={this.setPlayerIndex}/></div>
+            <button type="button" onClick={this.sendWhoOwnsACard}>Add info</button>
+        </div>;
+    }
+}
+
+interface CardSelectorProps {
+    cardType: number,
+    cardIndex: CardIndex,
+    setCardIndex: (newCardIndex: CardIndex) => void
+}
+
+class CardSelector extends React.Component<CardSelectorProps, {}> {
+    handleChange = (e: ChangeEvent<HTMLSelectElement>) => {
+        let cardIndexParts: Array<number> = e.target.value.split(" ").map((x: string) => parseInt(x, 10));
+        this.props.setCardIndex({ card_type: cardIndexParts[0], index: cardIndexParts[1] });
+    }
+    render = () => {
+        let options = [];
+        let allCardTypes = this.props.cardType == -1;
+        let iMin = allCardTypes ? 0 : this.props.cardType;
+        let iMax = allCardTypes ? CARD_TYPE_NAMES.length : (this.props.cardType + 1);
+        let label = allCardTypes ? "Card" : CARD_TYPE_NAMES[this.props.cardType];
+        for (let i = iMin; i < iMax; ++i) {
+            for (let j = 0; j < CARD_NAMES[i].length; ++j) {
+                options.push(<option value={i + ' ' + j} key={i + ' ' + j}>{CARD_NAMES[i][j].external}</option>);
+            }
+        }
+        return <span>{label}: <select value={this.props.cardIndex.card_type + ' ' + this.props.cardIndex.index} onChange={this.handleChange}>{options}</select></span>;
+    }
+}
+
+interface PlayerSelectorProps {
+    label: string,
+    includeSolution: boolean,
+    includeNone: boolean,
+    playerInfos: Array<PlayerInfo>,
+    playerIndex: number,
+    setPlayerIndex: (playerIndex: number) => void
+}
+
+class PlayerSelector extends React.Component<PlayerSelectorProps, {}> {
+    handleChange = (e: ChangeEvent<HTMLSelectElement>) => {
+        this.props.setPlayerIndex(parseInt(e.target.value));
+    }
+    render = () => {
+        let options = [];
+        if (this.props.includeNone) {
+            options.push(<option value={-1} key={-1}>None</option>);
+        }
+        for (let i = 0; i < this.props.playerInfos.length; ++i) {
+            options.push(<option value={i} key={i}>{this.props.playerInfos[i].name}</option>);
+        }
+        if (this.props.includeSolution) {
+            options.push(<option value={this.props.playerInfos.length} key={this.props.playerInfos.length}>Solution (case file)</option>);
+        }
+        return <span>{this.props.label}: <select value={this.props.playerIndex} onChange={this.handleChange}>{options}</select></span>
     }
 }
 
