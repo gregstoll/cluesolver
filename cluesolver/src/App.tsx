@@ -18,6 +18,9 @@ const _INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissSca
 const _EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Ms. White", "Mrs. Peacock"],
                     ["Knife", "Candlestick", "Revolver", "Lead Pipe", "Rope", "Wrench"],
                     ["Hall", "Conservatory", "Dining Room", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "Billiard Room"]];
+function compareCardIndexByCategory(card1: CardIndex, card2: CardIndex) {
+    return card1.card_type - card2.card_type;
+}
 function compareInternalCardsByCategory(card1: string, card2: string) {
   return categoryFromInternalCard(card1) - categoryFromInternalCard(card2);
 }
@@ -285,6 +288,71 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
             <td style={{ paddingLeft: 20, textAlign: 'left' }}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td>
             <td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()} /></td>
         </tr>;
+    }
+}
+
+interface GameInfoProps {
+    playerInfos: Array<PlayerInfo>,
+    cardInfos: Array<Array<CardInfo>>,
+    session: string,
+    isConsistent: boolean,
+    clauseInfos: ClauseInfoMap,
+    updateInfoFromJson: (json: any, haveEnteredData: boolean) => void,
+    addToHistory: (entry: HistoryEvent) => void,
+    sendClueRequest: (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => void
+}
+
+class GameInfo extends React.Component<GameInfoProps, {}> {
+    render = () => {
+        let infoRows = [];
+        for (let i = 0; i < CARD_TYPE_NAMES.length; ++i) {
+            infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th><th></th></tr>);
+            for (let j = 0; j < this.props.cardInfos[i].length; ++j) {
+                infoRows.push(<SpecificCardInfo key={i + ' ' + j} info={this.props.cardInfos[i][j]} playerInfos={this.props.playerInfos}/>);
+            }
+        }
+        return <div><div style={{float: 'left'}}><div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div><table><tbody>{infoRows}</tbody></table></div><div style={{float: 'left'}}>Enter new info:
+          <Tabs>
+              <TabList>
+                  <Tab>Who owns a card</Tab>
+                  <Tab>Suggestion made</Tab>
+              </TabList>
+              <TabPanel>
+                  <WhoOwnsACard playerInfos={this.props.playerInfos} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson} addToHistory={this.props.addToHistory} sendClueRequest={this.props.sendClueRequest} />
+              </TabPanel>
+              <TabPanel>
+                  <SuggestACard playerInfos={this.props.playerInfos} session={this.props.session} updateInfoFromJson={this.props.updateInfoFromJson} addToHistory={this.props.addToHistory} sendClueRequest={this.props.sendClueRequest} />
+              </TabPanel>
+          </Tabs>
+        </div>
+        <div style={{clear: 'both'}}/><ClauseInfo clauseInfos={this.props.clauseInfos} playerInfos={this.props.playerInfos} /></div>;
+    }
+}
+
+type Clause = Array<CardIndex>;
+//ClauseInfo is a map of player index to an array of array of cards
+type ClauseInfoMap = Map<number, Array<Clause>>;
+
+interface ClauseInfoProps {
+    playerInfos: Array<PlayerInfo>,
+    clauseInfos: ClauseInfoMap
+}
+
+class ClauseInfo extends React.Component<ClauseInfoProps, {}> {
+    render = () => {
+        let rows = [];
+        let playerIndices: Array<number> = Array.from(this.props.clauseInfos.keys());
+        for (let playerIndex of playerIndices) {
+            // make a copy since we're modifying it
+            let info = this.props.clauseInfos.get(playerIndex)!.slice();
+            for (let i = 0; i < info.length; ++i) {
+                let s = this.props.playerInfos[playerIndex].name + " has ";
+                let names = info[i].sort(compareCardIndexByCategory).map((x: CardIndex) => CARD_NAMES[x.card_type][x.index].external);
+                s += names.join(' or ');
+                rows.push(<tr key={playerIndex + ' ' + i}><td>{s}</td></tr>);
+            }
+        }
+        return <table><tbody>{rows}</tbody></table>;
     }
 }
 
