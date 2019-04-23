@@ -641,6 +641,134 @@ interface HistoryEntry {
     session: string,
 }
 
+interface SimulationProps {
+    playerInfos: Array<PlayerInfo>,
+    setDoingSimulation: (doingSimulation: boolean) => void,
+    sendClueRequest: (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => void,
+    session: string | null,
+    cardIndexFromInternalName : (name: string) => CardIndex,
+    setNumberOfSimulations: (simulations: number) => void,
+    setSimulationData: (simulationData: SimulationData) => void,
+    simData: SimulationData,
+    numberOfSimulations: number,
+    doingSimulation: boolean,
+    isConsistent: boolean
+}
+
+class Simulation extends React.Component<SimulationProps, {}> {
+    doSimulate = () => {
+        this.props.setDoingSimulation(true);
+        let that = this;
+        this.props.sendClueRequest('sess=' + this.props.session + '&action=simulate', function (json) {
+            let simData = new Map<CardIndex, Array<number>>();
+            let totalNumberOfSims = 0;
+            for (let jsonKey in json.simData) {
+                let key = jsonKey as string;
+                let data : Array<number> = json.simData[key];
+                totalNumberOfSims = data.reduce((previousValue: number, currentValue: number) => previousValue + currentValue, 0);
+                let cardKey = that.props.cardIndexFromInternalName(key);
+                if (totalNumberOfSims > 0) {
+                    simData.set(cardKey, data.map((x: number) => x / totalNumberOfSims));
+                } else {
+                    simData.set(cardKey, data.map((x: number) => 0.0));
+                }
+            }
+            that.props.setDoingSimulation(false);
+            that.props.setNumberOfSimulations(totalNumberOfSims);
+            that.props.setSimulationData(simData);
+        }, function(errorText) {
+            alert('Error: ' + errorText);
+            that.props.setDoingSimulation(false);
+        },
+        true);
+    }
+    interpolateBetween = (percent: number, colorArray: Array<Array<number>>): any => {
+        let quartiles = colorArray.length - 1;
+        let quartileSpan = 100 / quartiles;
+        let quartile = Math.floor((percent / 100) * quartiles);
+        if (quartile >= quartiles) {
+            quartile = quartiles - 1;
+        }
+        let r = colorArray[quartile][0] + (colorArray[quartile+1][0] - colorArray[quartile][0]) * ((percent - quartile * quartileSpan) / quartileSpan);
+        let g = colorArray[quartile][1] + (colorArray[quartile+1][1] - colorArray[quartile][1]) * ((percent - quartile * quartileSpan) / quartileSpan);
+        let b = colorArray[quartile][2] + (colorArray[quartile+1][2] - colorArray[quartile][2]) * ((percent - quartile * quartileSpan) / quartileSpan);
+        return {backgroundColor: 'rgb(' + Math.round(r) + ', ' + Math.round(g) + ', ' + Math.round(b) + ')', textAlign: 'right'};
+    }
+    getColorProp = (percent: number) => {
+        // Interpolation between
+        // (3, 146, 207) blue
+        // (123, 192, 67) green
+        //// (253, 244, 152) yellow
+        // (243, 119, 54) orange
+        // (238, 64, 53) red
+        // http://www.color-hex.com/color-palette/807
+        return this.interpolateBetween(percent,
+            [[3, 146, 207],
+             [123, 192, 67],
+             //[253, 244, 152],
+             [243, 119, 54],
+             [238, 64, 53]
+             ]);
+    }
+    render = () => {
+        let infoRows = [];
+        let playerHeaderEntries = [];
+        for (let i = 0; i < this.props.playerInfos.length; ++i) {
+            playerHeaderEntries.push(<th className="playerHeader" key={"player" + i}>{this.props.playerInfos[i].name}</th>);
+        }
+        playerHeaderEntries.push(<th className="playerHeader" key="solution">Solution</th>);
+        for (let i = 0; i < CARD_TYPE_NAMES.length; ++i) {
+            infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th>{i == 0 ? playerHeaderEntries : undefined}</tr>);
+            for (let j = 0; j < CARD_NAMES[i].length; ++j) {
+                let cells = [<td key="cardName">{CARD_NAMES[i][j].external}</td>];
+                let dataArray = this.props.simData.get({card_type: i, index: j});
+                for (let k = 0; k < this.props.playerInfos.length; ++k) {
+                    if (dataArray != undefined && dataArray[k] !== undefined) {
+                        let v = (Math.round(dataArray[k] * 1000) / 10);
+                        let c = this.getColorProp(v);
+                        let vString = Number(v).toFixed(1) + '%';
+                        cells.push(<td style={c} key={"player" + k}>{vString}</td>);
+                    }
+                    else {
+                        cells.push(<td key={"player" + k}></td>);
+                    }
+                }
+                let sc = {};
+                if (dataArray != undefined && dataArray[this.props.playerInfos.length] !== undefined) {
+                    let percent = (Math.round(dataArray[this.props.playerInfos.length] * 1000) / 10);
+                    sc = this.getColorProp(percent);
+                    let percentString = Number(percent).toFixed(1) + '%';
+                    cells.push(<td style={sc} key="solution">{percentString}</td>);
+                }
+                else {
+                    cells.push(<td style={sc} key="solution"></td>);
+                }
+                infoRows.push(<tr key={i + ' ' + j}>{cells}</tr>);
+            }
+        }
+        let working = undefined;
+        if (this.props.doingSimulation) {
+            working = <img src="images/loading.gif"/>;
+        }
+        let simulationSpan = undefined;
+        if (this.props.numberOfSimulations > -1) {
+            if (this.props.numberOfSimulations > 0) {
+                simulationSpan = <span style={{marginLeft: 20, fontStyle: "italic"}}>Simulations done: {this.props.numberOfSimulations}</span>;
+            } else {
+                simulationSpan = <span className="warning" style={{marginLeft: 20, fontStyle: "italic"}}>No simulations done!</span>;
+            }
+        }
+        return <div>
+          <div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div>
+          <div><button type="button" onClick={this.doSimulate} disabled={this.props.doingSimulation}>Simulate</button>{working}{simulationSpan}</div>
+          <div style={{display: 'flex'}}>
+              <table><tbody>{infoRows}</tbody></table>
+              <div style={{display: 'flex', verticalAlign: 'top', flexDirection: 'row', height: 300}}><img src="images/rainbow.png" style={{height: 300, width: 50}}/><div style={{display: 'flex', flexDirection: 'column', height: 300}}><div style={{alignSelf: 'flex-start'}}>0%</div><div style={{flex: 1}}/><div style={{alignSelf: 'flex-end'}}>100%</div></div></div>
+          </div>
+      </div>;
+    }
+}
+
 type SimulationData = Map<CardIndex, Array<number>>;
 
 interface AppState {
@@ -688,6 +816,16 @@ class App extends Component<{}, AppState> {
             session: null
         };
     }
+    setSimulationData = (data: SimulationData) => {
+        this.setState({simData: data});
+    }
+    setNumberOfSimulations = (n: number) => {
+        this.setState({numberOfSimulations: n});
+    }
+    setDoingSimulation = (isDoingSimulation: boolean) => {
+        this.setState({doingSimulation: isDoingSimulation});
+    }
+
     //TODO could be async
     sendClueRequest = (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => {
         if (!skipWorking) {
@@ -926,7 +1064,18 @@ class App extends Component<{}, AppState> {
                             doUndo={this.doUndo} />
                     </TabPanel>
                     <TabPanel>
-                        <div>Simulation</div>
+                        <Simulation
+                            playerInfos={this.state.playerInfos}
+                            session={this.state.session}
+                            isConsistent={this.state.isConsistent}
+                            sendClueRequest={this.sendClueRequest}
+                            cardIndexFromInternalName={this.cardIndexFromInternalName}
+                            simData={this.state.simData}
+                            numberOfSimulations={this.state.numberOfSimulations}
+                            doingSimulation={this.state.doingSimulation}
+                            setSimulationData={this.setSimulationData}
+                            setNumberOfSimulations={this.setNumberOfSimulations}
+                            setDoingSimulation={this.setDoingSimulation} />
                     </TabPanel>
                 </Tabs>
             </div>
