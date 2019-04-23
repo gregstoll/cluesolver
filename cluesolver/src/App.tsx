@@ -2,7 +2,7 @@ import React, { Component, ChangeEvent } from 'react';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import "react-tabs/style/react-tabs.css";
 import './App.css';
-import { isNullOrUndefined } from 'util';
+import { isNullOrUndefined, isNull } from 'util';
 
 //TODO - for dev only
 const SCRIPT_NAME = "https://gregstoll.dyndns.org/cluesolver/clue.cgi";
@@ -326,6 +326,57 @@ class GameInfo extends React.Component<GameInfoProps, {}> {
           </Tabs>
         </div>
         <div style={{clear: 'both'}}/><ClauseInfo clauseInfos={this.props.clauseInfos} playerInfos={this.props.playerInfos} /></div>;
+    }
+}
+
+interface HistoryProps {
+    doUndo: () => void,
+    history: Array<HistoryEntry>,
+    playerInfos: Array<PlayerInfo>,
+}
+
+class History extends React.Component<HistoryProps, {}> {
+    doUndo = () => {
+        this.props.doUndo();
+    }
+    render = () => {
+        let entries = [];
+        for (let i = 0; i < this.props.history.length; ++i)
+        {
+            let event = this.props.history[i].event;
+            let description = '';
+            switch (event.history_type) {
+                case "suggestion":
+                    description = this.props.playerInfos[event.suggester_index].name + " suggested " + CARD_NAMES[0][event.suspect_index].external + ", " + CARD_NAMES[1][event.weapon_index].external + ", " + CARD_NAMES[2][event.room_index].external + " ";
+                    if (event.refuter_index == -1) {
+                        description += " - no one refuted";
+                    }
+                    else {
+                        description += " - refuted by " + this.props.playerInfos[event.refuter_index].name + " with card ";
+                        //TODO - check for none
+                        if (isNull(event.refuted_card_index) || (event.refuted_card_index.card_type == -1 && event.refuted_card_index.index == -1)) {
+                            description += "Unknown";
+                        }
+                        else {
+                            description += CARD_NAMES[event.refuted_card_index.card_type][event.refuted_card_index.index].external;
+                        }
+                    }
+                    break;
+                case "whoOwns":
+                    let player = "Solution (case file)";
+                    if (event.player_index < this.props.playerInfos.length) {
+                        player = this.props.playerInfos[event.player_index].name;
+                    }
+                    description = CARD_NAMES[event.card_index.card_type][event.card_index.index].external + " owned by " + player;
+                    break;
+            }
+            entries.push(<li key={i}>{description}</li>);
+        }
+
+        return <div>
+          <ul>{entries}</ul>
+          <div><button type="button" disabled={entries.length == 0} onClick={this.doUndo}>Undo latest information</button></div>
+        </div>;
     }
 }
 
@@ -823,6 +874,15 @@ class App extends Component<{}, AppState> {
         });
     }
 
+    doUndo = () => {
+        if (this.state.history.length > 0) {
+            let that = this;
+            this.updateCardInfo(this.state.history[this.state.history.length - 1].session, this.state.history.length > 1, function () {
+                that.setState({'history': that.state.history.slice(0, that.state.history.length - 1)});
+            });
+        }
+    }
+
     componentDidMount = () => {
         this.newSession();
     }
@@ -860,7 +920,10 @@ class App extends Component<{}, AppState> {
                             sendClueRequest={this.sendClueRequest} />
                     </TabPanel>
                     <TabPanel>
-                        <div>History</div>
+                        <History
+                            playerInfos={this.state.playerInfos}
+                            history={this.state.history}
+                            doUndo={this.doUndo} />
                     </TabPanel>
                     <TabPanel>
                         <div>Simulation</div>
