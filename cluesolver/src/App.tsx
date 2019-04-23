@@ -660,17 +660,16 @@ class Simulation extends React.Component<SimulationProps, {}> {
         this.props.setDoingSimulation(true);
         let that = this;
         this.props.sendClueRequest('sess=' + this.props.session + '&action=simulate', function (json) {
-            let simData = new Map<CardIndex, Array<number>>();
+            let simData = new Map<string, Array<number>>();
             let totalNumberOfSims = 0;
             for (let jsonKey in json.simData) {
                 let key = jsonKey as string;
                 let data : Array<number> = json.simData[key];
                 totalNumberOfSims = data.reduce((previousValue: number, currentValue: number) => previousValue + currentValue, 0);
-                let cardKey = that.props.cardIndexFromInternalName(key);
                 if (totalNumberOfSims > 0) {
-                    simData.set(cardKey, data.map((x: number) => x / totalNumberOfSims));
+                    simData.set(key, data.map((x: number) => x / totalNumberOfSims));
                 } else {
-                    simData.set(cardKey, data.map((x: number) => 0.0));
+                    simData.set(key, data.map((x: number) => 0.0));
                 }
             }
             that.props.setDoingSimulation(false);
@@ -721,7 +720,7 @@ class Simulation extends React.Component<SimulationProps, {}> {
             infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th>{i == 0 ? playerHeaderEntries : undefined}</tr>);
             for (let j = 0; j < CARD_NAMES[i].length; ++j) {
                 let cells = [<td key="cardName">{CARD_NAMES[i][j].external}</td>];
-                let dataArray = this.props.simData.get({card_type: i, index: j});
+                let dataArray = this.props.simData.get(CARD_NAMES[i][j].internal);
                 for (let k = 0; k < this.props.playerInfos.length; ++k) {
                     if (dataArray != undefined && dataArray[k] !== undefined) {
                         let v = (Math.round(dataArray[k] * 1000) / 10);
@@ -769,7 +768,8 @@ class Simulation extends React.Component<SimulationProps, {}> {
     }
 }
 
-type SimulationData = Map<CardIndex, Array<number>>;
+// Map from internal card name to probabilities (between 0-1)
+type SimulationData = Map<string, Array<number>>;
 
 interface AppState {
     playerInfos: Array<PlayerInfo>,
@@ -810,7 +810,7 @@ class App extends Component<{}, AppState> {
             clauseInfos: new Map<number, Array<Array<CardIndex>>>(),
             history: [],
             working: false,
-            simData: new Map<CardIndex, Array<number>>(),
+            simData: new Map<string, Array<number>>(),
             doingSimulation: false,
             numberOfSimulations: -1,
             session: null
