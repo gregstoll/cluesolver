@@ -2,17 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
-    <meta name="theme-color" content="#000000" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!-- <meta name="theme-color" content="#000000" /> -->
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.
@@ -55,12 +49,11 @@ does 2000 of them) - basically it chooses each possible solution, tries to
 assign cards to each player and sees if the solution is consistent or not (and if so, counts it).</p>
         <p>The images on the Game Info tab are taken from the <a href="http://www.famfamfam.com/lab/icons/silk/">Silk icon set at famfamfam.com</a> - thanks!</p>
         <p>Clue is a registered trademark of Hasbro, inc.  <a href="http://www.hasbro.com/games/parkerbrothers/clue/">Official Clue site</a></p>
-  <p>Here are my source files:</p>
-  <ul>
-      <li>The UI code (using the React framework) is all in this file - just View Source to take a look!</li>
-      <li><a href="clueengine.py.txt">clueengine.py</a> - the Python backend that does the deductions and simulations.</li>
-      <li><a href="clue.py.txt">clue.py</a> - the CGI script that handles communications between the frontend and cluesolver.py.</li>
-  </ul>
+        <p>The source files are <a href="https://github.com/gregstoll/cluesolver">available on GitHub</a>. The backend scripts are:</p>
+        <ul>
+            <li><a href="https://github.com/gregstoll/cluesolver/blob/master/clueengine.py">clueengine.py</a> - the Python backend that does the deductions and simulations.</li>
+            <li><a href="https://github.com/gregstoll/cluesolver/blob/master/clue.py">clue.py</a> - the CGI script that handles communications between the frontend and cluesolver.py.</li>
+        </ul>
   
   <p><a href="https://github.com/gregstoll/cluesolver"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/365986a132ccd6a44c23a9169022c0b5c890c387/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f7265645f6161303030302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png"></a></p>
 
