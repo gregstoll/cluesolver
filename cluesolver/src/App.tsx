@@ -984,8 +984,11 @@ class App extends Component<{}, AppState> {
     }
 
     addToHistory = (historyEvent: HistoryEvent) => {
-        //TODO - assert this is non-null?
-        let session = this.state.session!;
+        if (isNullOrUndefined(this.state.session)) {
+            alert("Session is null when adding history entry?!");
+            return;
+        }
+        let session = this.state.session;
         this.setState(function(previousState, currentProps) {
             let history = previousState.history;
             history.push({ event: historyEvent, session: session });
@@ -997,7 +1000,7 @@ class App extends Component<{}, AppState> {
         if (this.state.history.length > 0) {
             let that = this;
             this.updateCardInfo(this.state.history[this.state.history.length - 1].session, this.state.history.length > 1, function () {
-                that.setState({'history': that.state.history.slice(0, that.state.history.length - 1)});
+                that.setState({history: that.state.history.slice(0, that.state.history.length - 1)});
             });
         }
     }
