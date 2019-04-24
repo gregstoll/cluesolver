@@ -353,8 +353,7 @@ class History extends React.Component<HistoryProps, {}> {
                     }
                     else {
                         description += " - refuted by " + this.props.playerInfos[event.refuter_index].name + " with card ";
-                        //TODO - check for none
-                        if (isNull(event.refuted_card_index) || (isNone(event.refuted_card_index))) {
+                        if (isNull(event.refuted_card_index) || isNone(event.refuted_card_index)) {
                             description += "Unknown";
                         }
                         else {
