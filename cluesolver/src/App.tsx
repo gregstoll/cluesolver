@@ -560,18 +560,20 @@ class RefutingCardSelector extends React.Component<RefutingCardSelectorProps, {}
         let cardIndexParts: Array<number> = e.target.value.split(" ").map((x: string) => parseInt(x, 10));
         this.props.setCardIndex({ card_type: cardIndexParts[0], index: cardIndexParts[1] });
     }
+    cardIndexToOptionString = (cardIndex: CardIndex): string => {
+        return cardIndex.card_type + " " + cardIndex.index;
+    }
     render = () => {
         let options = [];
         let invalidSelectedCard = true;
-        options.push(<option value={NONE_CARD_INDEX.card_type + " " + NONE_CARD_INDEX.index} key = "-1" > None / Unknown</option >);
-        let selectedCardIndexString = this.props.cardIndex.card_type + ' ' + this.props.cardIndex.index;
+        options.push(<option value={this.cardIndexToOptionString(NONE_CARD_INDEX)} key="-1" > None / Unknown</option >);
+        let selectedCardIndexString = this.cardIndexToOptionString(this.props.cardIndex);
         if (isNone(this.props.cardIndex)) {
             invalidSelectedCard = false;
         }
         for (let i = 0; i < this.props.cardIndices.length; ++i) {
             let cardInfo = CARD_NAMES[i][this.props.cardIndices[i]];
-            //TODO - should really have a method for this
-            let cardIndexString = cardInfo.card_index.card_type + ' ' + cardInfo.card_index.index;
+            let cardIndexString = this.cardIndexToOptionString(cardInfo.card_index);
             if (selectedCardIndexString == cardIndexString) {
                 invalidSelectedCard = false;
             }
