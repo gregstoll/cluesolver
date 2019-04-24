@@ -962,7 +962,6 @@ class App extends Component<{}, AppState> {
         });
     }
     setNumberOfCards = (playerIndex: number, numberOfCards: number) => {
-        let that = this;
         this.setState((previousState, currentProps) => {
             let playerInfos = previousState.playerInfos.slice(0, previousState.playerInfos.length);
             playerInfos[playerIndex] = { name: playerInfos[playerIndex].name, numberOfCards: numberOfCards };
@@ -971,7 +970,6 @@ class App extends Component<{}, AppState> {
     }
 
     setNumberOfPlayers = (numberOfPlayers: number) => {
-        let that = this;
         this.setState((previousState, currentProps) => {
             return { playerInfos: this.internalSetNumberOfPlayers(previousState.playerInfos, numberOfPlayers) };
         });
