@@ -965,21 +965,15 @@ class App extends Component<{}, AppState> {
         let that = this;
         this.setState((previousState, currentProps) => {
             let playerInfos = previousState.playerInfos.slice(0, previousState.playerInfos.length);
-            playerInfos[playerIndex].numberOfCards = numberOfCards;
+            playerInfos[playerIndex] = { name: playerInfos[playerIndex].name, numberOfCards: numberOfCards };
             return { playerInfos: playerInfos };
-        }, () => {
-            // TODO - should be using a componentDidUpdate() callback instead? see https://reactjs.org/docs/react-component.html#setstate
-            that.newSession();
         });
     }
 
     setNumberOfPlayers = (numberOfPlayers: number) => {
         let that = this;
         this.setState((previousState, currentProps) => {
-            return {playerInfos: this.internalSetNumberOfPlayers(previousState.playerInfos, numberOfPlayers)};
-        }, () => {
-            // TODO - should be using a componentDidUpdate() callback instead? see https://reactjs.org/docs/react-component.html#setstate
-            that.newSession();
+            return { playerInfos: this.internalSetNumberOfPlayers(previousState.playerInfos, numberOfPlayers) };
         });
     }
     setPlayerName = (playerIndex: number, playerName: string) => {
@@ -1015,6 +1009,25 @@ class App extends Component<{}, AppState> {
 
     componentDidMount = () => {
         this.newSession();
+    }
+
+    componentDidUpdate = (prevProps: {}, prevState: AppState, snapshot: any) => {
+        // See if the number of players or cards per player has changed
+        let mismatch: boolean = false;
+        if (prevState.playerInfos.length != this.state.playerInfos.length) {
+            mismatch = true;
+        }
+        if (!mismatch) {
+            for (let i = 0; i < prevState.playerInfos.length; ++i) {
+                if (prevState.playerInfos[i].numberOfCards != this.state.playerInfos[i].numberOfCards) {
+                    mismatch = true;
+                    break;
+                }
+            }
+        }
+        if (mismatch) {
+            this.newSession();
+        }
     }
 
     render = () => {
