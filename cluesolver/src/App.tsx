@@ -222,15 +222,14 @@ interface CardInfo {
 }
 
 interface SpecificCardInfoProps {
-    //TODO - rename to cardInfo
-    info: CardInfo,
+    cardInfo: CardInfo,
     playerInfos: Array<PlayerInfo>
 }
 
 class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
     getImgSrc = () => {
         let name : string;
-        switch (this.props.info.state) {
+        switch (this.props.cardInfo.state) {
             case CardState.OwnedByPlayer:
                 name = 'cancel.png';
                 break;
@@ -245,26 +244,26 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
         return 'images/' + name;
     }
     getOwnedByString = () => {
-        if (this.props.info.owners && !(this.props.info.owners.length  > 0)) {
+        if (this.props.cardInfo.owners && !(this.props.cardInfo.owners.length  > 0)) {
             return "???";
         }
         let s = "";
-        for (let i = 0; i < this.props.info.owners.length; ++i) {
-            let curIndex = this.props.info.owners[i];
+        for (let i = 0; i < this.props.cardInfo.owners.length; ++i) {
+            let curIndex = this.props.cardInfo.owners[i];
             if (curIndex == this.props.playerInfos.length) {
                 s += "(solution)";
             }
             else {
                 s += this.props.playerInfos[curIndex].name;
             }
-            if (i < this.props.info.owners.length - 1) {
+            if (i < this.props.cardInfo.owners.length - 1) {
                 s += " or ";
             }
         }
         return s;
     }
     getAltText = () => {
-        switch (this.props.info.state) {
+        switch (this.props.cardInfo.state) {
             case CardState.OwnedByPlayer:
               return "Owned by " + this.getOwnedByString();
               break;
@@ -273,7 +272,7 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
               break;
             case CardState.Unknown:
             default:
-              if (this.props.info.owners && this.props.info.owners.length > 0) {
+              if (this.props.cardInfo.owners && this.props.cardInfo.owners.length > 0) {
                   return "Owned by " + this.getOwnedByString();
               } else {
                   return "Unknown";
@@ -283,7 +282,7 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
     }
     render = () => {
         return <tr>
-            <td style={{ paddingLeft: 20, textAlign: 'left' }}>{cardNameFromCardIndex(this.props.info).external}</td>
+            <td style={{ paddingLeft: 20, textAlign: 'left' }}>{cardNameFromCardIndex(this.props.cardInfo).external}</td>
             <td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()} /></td>
         </tr>;
     }
@@ -306,7 +305,7 @@ class GameInfo extends React.Component<GameInfoProps, {}> {
         for (let i = 0; i < CARD_TYPE_NAMES.length; ++i) {
             infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th><th></th></tr>);
             for (let j = 0; j < this.props.cardInfos[i].length; ++j) {
-                infoRows.push(<SpecificCardInfo key={i + ' ' + j} info={this.props.cardInfos[i][j]} playerInfos={this.props.playerInfos}/>);
+                infoRows.push(<SpecificCardInfo key={i + ' ' + j} cardInfo={this.props.cardInfos[i][j]} playerInfos={this.props.playerInfos}/>);
             }
         }
         return <div><div style={{float: 'left'}}><div className="warning">{!this.props.isConsistent && "Game is no longer consistent!"}</div><table><tbody>{infoRows}</tbody></table></div><div style={{float: 'left'}}>Enter new info:
