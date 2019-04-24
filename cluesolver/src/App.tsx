@@ -778,6 +778,7 @@ interface AppState {
     simData: SimulationData,
     doingSimulation: boolean,
     numberOfSimulations: number,
+    // This is an opaque description of the session that's provided and understood by the backing Python script
     session: string | null
 }
 
