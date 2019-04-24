@@ -22,12 +22,15 @@ function compareCardIndexByCategory(card1: CardIndex, card2: CardIndex) {
     return card1.card_type - card2.card_type;
 }
 interface CardIndex {
-    card_type: number,
+    card_type: CardType,
     index: number
 }
-//TODO - make this an enum
+enum CardType {
+    Suspects = 0,
+    Weapons = 1,
+    Rooms = 2
+}
 const CARD_TYPE_NAMES = ["Suspects", "Weapons", "Rooms"];
-//TODO - use CardIndex
 interface CardName {
     card_index: CardIndex,
     internal: string,
@@ -411,7 +414,7 @@ interface WhoOwnsACardState {
 class WhoOwnsACard extends React.Component<WhoOwnsACardProps, WhoOwnsACardState> {
     constructor(props: WhoOwnsACardProps) {
         super(props);
-        this.state = { cardIndex: { card_type: 0, index: 0 }, playerIndex: 0 };
+        this.state = { cardIndex: { card_type: 0 as CardType, index: 0 }, playerIndex: 0 };
     }
     setCardIndex = (newCardIndex: CardIndex) => {
         this.setState({cardIndex: newCardIndex});
@@ -451,6 +454,7 @@ interface SuggestACardState {
 class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState> {
     constructor(props: WhoOwnsACardProps) {
         super(props);
+        //TODO none
         this.state = { suggestingPlayerIndex: 0, refutingPlayerIndex: -1, cardIndices: [0, 0, 0], refutingCardIndex: { card_type: -1, index: -1 } };
     }
     setSuggestingPlayerIndex = (playerIndex: number) => {
@@ -502,9 +506,9 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
         // TODO - hide suggesting player in refuting player box?
         return <div>
             <div><PlayerSelector label="Made by" includeSolution={false} playerInfos={this.props.playerInfos} playerIndex={this.state.suggestingPlayerIndex} setPlayerIndex={this.setSuggestingPlayerIndex} /></div>
-            <div><CardSelector cardType={0} cardIndex={{ card_type: 0, index: this.state.cardIndices[0] }} setCardIndex={this.setCardIndex} /></div>
-            <div><CardSelector cardType={1} cardIndex={{ card_type: 1, index: this.state.cardIndices[1] }} setCardIndex={this.setCardIndex}/></div>
-            <div><CardSelector cardType={2} cardIndex={{ card_type: 2, index: this.state.cardIndices[2] }} setCardIndex={this.setCardIndex}/></div>
+            <div><CardSelector cardType={0} cardIndex={{ card_type: CardType.Suspects, index: this.state.cardIndices[0] }} setCardIndex={this.setCardIndex} /></div>
+            <div><CardSelector cardType={1} cardIndex={{ card_type: CardType.Weapons, index: this.state.cardIndices[1] }} setCardIndex={this.setCardIndex} /></div>
+            <div><CardSelector cardType={2} cardIndex={{ card_type: CardType.Rooms, index: this.state.cardIndices[2] }} setCardIndex={this.setCardIndex} /></div>
             <div><PlayerSelector label="Refuted by" includeSolution={false} includeNone={true} playerInfos={this.props.playerInfos} playerIndex={this.state.refutingPlayerIndex} setPlayerIndex={this.setRefutingPlayerIndex}/></div>
             <div><RefutingCardSelector cardIndex={this.state.refutingCardIndex} cardIndices={this.state.cardIndices} setCardIndex={this.setRefutingCardIndex} /></div>
             <button type="button" onClick={this.sendSuggestion}>Add info</button>
@@ -573,6 +577,7 @@ class RefutingCardSelector extends React.Component<RefutingCardSelectorProps, {}
         if (invalidSelectedCard) {
             // this happens if there's a selected refuting card, and then
             // the choices change so this isn't an option anymore
+            //TODO none
             this.props.setCardIndex({ card_type: -1, index: -1 });
         }
         return <span>Refuting card: <select value={selectedCardIndexString} onChange={this.handleChange}>{options}</select></span>;
@@ -787,7 +792,7 @@ class App extends Component<{}, AppState> {
         for (let i = 0; i < CARD_NAMES.length; ++i) {
             cardInfos.push([]);
             for (let j = 0; j < CARD_NAMES[i].length; ++j) {
-                cardInfos[i].push({'card_type': i, 'index': j, 'state': CardState.Unknown, 'owners': []});
+                cardInfos[i].push({card_type: i, index: j, state: CardState.Unknown, owners: []});
             }
         }
 
@@ -882,6 +887,7 @@ class App extends Component<{}, AppState> {
                 }
             }
         }
+        //TODO none
         return { card_type: -1, index: -1 };
     }
 
