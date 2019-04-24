@@ -2,7 +2,7 @@ import React, { Component, ChangeEvent } from 'react';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import "react-tabs/style/react-tabs.css";
 import './App.css';
-import { isNullOrUndefined, isNull } from 'util';
+import { isNullOrUndefined, isNull, isUndefined } from 'util';
 
 //TODO - for dev only
 const SCRIPT_NAME = "https://gregstoll.dyndns.org/cluesolver/clue.cgi";
@@ -40,14 +40,19 @@ const NONE_CARD_INDEX: CardIndex = { card_type: -1, index: -1 };
 function isNone(cardIndex: CardIndex) {
     return cardIndex.card_type == NONE_CARD_INDEX.card_type && cardIndex.index == NONE_CARD_INDEX.index;
 }
-//TODO - refactor this into a method that takes a CardIndex or something
 let CARD_NAMES : Array<Array<CardName>> = [];
+let INTERNAL_NAME_TO_CARD_INDEX = new Map<string, CardIndex>();
 for (let i = 0; i < _INTERNAL_NAMES.length; ++i) {
   CARD_NAMES.push([]);
   for (let j = 0; j < _INTERNAL_NAMES[i].length; ++j) {
       let card_index: CardIndex = { card_type: i, index: j };
-      CARD_NAMES[i].push({card_index: card_index, internal: _INTERNAL_NAMES[i][j], external: _EXTERNAL_NAMES[i][j]});
+      let internalName = _INTERNAL_NAMES[i][j];
+      CARD_NAMES[i].push({ card_index: card_index, internal: internalName, external: _EXTERNAL_NAMES[i][j] });
+      INTERNAL_NAME_TO_CARD_INDEX.set(internalName, card_index);
   }
+}
+function cardNameFromCardIndex(cardIndex: CardIndex) : CardName {
+    return CARD_NAMES[cardIndex.card_type][cardIndex.index];
 }
 
 enum CardState {
@@ -278,7 +283,7 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
     }
     render = () => {
         return <tr>
-            <td style={{ paddingLeft: 20, textAlign: 'left' }}>{CARD_NAMES[this.props.info.card_type][this.props.info.index].external}</td>
+            <td style={{ paddingLeft: 20, textAlign: 'left' }}>{cardNameFromCardIndex(this.props.info).external}</td>
             <td><img src={this.getImgSrc()} alt={this.getAltText()} title={this.getAltText()} /></td>
         </tr>;
     }
@@ -340,7 +345,10 @@ class History extends React.Component<HistoryProps, {}> {
             let description = '';
             switch (event.history_type) {
                 case "suggestion":
-                    description = this.props.playerInfos[event.suggester_index].name + " suggested " + CARD_NAMES[0][event.suspect_index].external + ", " + CARD_NAMES[1][event.weapon_index].external + ", " + CARD_NAMES[2][event.room_index].external + " ";
+                    description = this.props.playerInfos[event.suggester_index].name + " suggested " +
+                        cardNameFromCardIndex({ card_type: CardType.Suspects, index: event.suspect_index }).external + ", " +
+                        cardNameFromCardIndex({ card_type: CardType.Weapons, index: event.weapon_index }).external + ", " +
+                        cardNameFromCardIndex({ card_type: CardType.Rooms, index: event.room_index }).external + " ";
                     if (event.refuter_index == -1) {
                         description += " - no one refuted";
                     }
@@ -351,7 +359,7 @@ class History extends React.Component<HistoryProps, {}> {
                             description += "Unknown";
                         }
                         else {
-                            description += CARD_NAMES[event.refuted_card_index.card_type][event.refuted_card_index.index].external;
+                            description += cardNameFromCardIndex(event.refuted_card_index).external;
                         }
                     }
                     break;
@@ -360,7 +368,7 @@ class History extends React.Component<HistoryProps, {}> {
                     if (event.player_index < this.props.playerInfos.length) {
                         player = this.props.playerInfos[event.player_index].name;
                     }
-                    description = CARD_NAMES[event.card_index.card_type][event.card_index.index].external + " owned by " + player;
+                    description = cardNameFromCardIndex(event.card_index).external + " owned by " + player;
                     break;
             }
             entries.push(<li key={i}>{description}</li>);
@@ -391,7 +399,7 @@ class ClauseInfo extends React.Component<ClauseInfoProps, {}> {
             let info = this.props.clauseInfos.get(playerIndex)!.slice();
             for (let i = 0; i < info.length; ++i) {
                 let s = this.props.playerInfos[playerIndex].name + " has ";
-                let names = info[i].sort(compareCardIndexByCategory).map((x: CardIndex) => CARD_NAMES[x.card_type][x.index].external);
+                let names = info[i].sort(compareCardIndexByCategory).map((x: CardIndex) => cardNameFromCardIndex(x).external);
                 s += names.join(' or ');
                 rows.push(<tr key={playerIndex + ' ' + i}><td>{s}</td></tr>);
             }
@@ -424,7 +432,7 @@ class WhoOwnsACard extends React.Component<WhoOwnsACardProps, WhoOwnsACardState>
         this.setState({playerIndex: newPlayerIndex});
     }
     sendWhoOwnsACard = () => {
-        let data = "sess=" + this.props.session + "&action=whoOwns&owner=" + this.state.playerIndex + "&card=" + CARD_NAMES[this.state.cardIndex.card_type][this.state.cardIndex.index].internal;
+        let data = "sess=" + this.props.session + "&action=whoOwns&owner=" + this.state.playerIndex + "&card=" + cardNameFromCardIndex(this.state.cardIndex).internal;
         let description: HistoryWhoOwns = {history_type: 'whoOwns', player_index: this.state.playerIndex, card_index: this.state.cardIndex};
         let that = this;
         this.props.sendClueRequest(data, (json: any) => {
@@ -475,14 +483,14 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
     sendSuggestion = () => {
         let data = "sess=" + this.props.session + "&action=suggestion&suggestingPlayer=" + this.state.suggestingPlayerIndex;
         for (let i = 0; i < CARD_TYPE_NAMES.length; ++i) {
-            data += "&card" + (i+1) + "=" + CARD_NAMES[i][this.state.cardIndices[i]].internal;
+            data += "&card" + (i + 1) + "=" + cardNameFromCardIndex({ card_type: i, index: this.state.cardIndices[i] }).internal;
         }
         data += "&refutingPlayer=" + this.state.refutingPlayerIndex + "&refutingCard=";
         if (isNone(this.state.refutingCardIndex)) { 
             data += "None";
         }
         else {
-            data += CARD_NAMES[this.state.refutingCardIndex.card_type][this.state.refutingCardIndex.index].internal;
+            data += cardNameFromCardIndex(this.state.refutingCardIndex).internal;
         }
         const description : HistorySuggestion = {
             history_type: "suggestion",
@@ -874,16 +882,12 @@ class App extends Component<{}, AppState> {
         return playerInfo;
     }
 
-    cardIndexFromInternalName = (name: string) : CardIndex => {
-        // TODO - optimize this
-        for (let i = 0; i < CARD_NAMES.length; ++i) {
-            for (let j = 0; j < CARD_NAMES[i].length; ++j) {
-                if (CARD_NAMES[i][j].internal === name) {
-                    return { card_type: i, index: j };
-                }
-            }
+    cardIndexFromInternalName = (name: string): CardIndex => {
+        let cardIndex = INTERNAL_NAME_TO_CARD_INDEX.get(name);
+        if (isUndefined(cardIndex)) {
+            return NONE_CARD_INDEX;
         }
-        return NONE_CARD_INDEX;
+        return cardIndex;
     }
 
     updateInfoFromJson = (json: any, haveEnteredData: boolean) => {
