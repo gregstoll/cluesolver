@@ -36,6 +36,10 @@ interface CardName {
     internal: string,
     external: string
 }
+const NONE_CARD_INDEX: CardIndex = { card_type: -1, index: -1 };
+function isNone(cardIndex: CardIndex) {
+    return cardIndex.card_type == NONE_CARD_INDEX.card_type && cardIndex.index == NONE_CARD_INDEX.index;
+}
 //TODO - refactor this into a method that takes a CardIndex or something
 let CARD_NAMES : Array<Array<CardName>> = [];
 for (let i = 0; i < _INTERNAL_NAMES.length; ++i) {
@@ -346,7 +350,7 @@ class History extends React.Component<HistoryProps, {}> {
                     else {
                         description += " - refuted by " + this.props.playerInfos[event.refuter_index].name + " with card ";
                         //TODO - check for none
-                        if (isNull(event.refuted_card_index) || (event.refuted_card_index.card_type == -1 && event.refuted_card_index.index == -1)) {
+                        if (isNull(event.refuted_card_index) || (isNone(event.refuted_card_index))) {
                             description += "Unknown";
                         }
                         else {
@@ -479,7 +483,7 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
         }
         data += "&refutingPlayer=" + this.state.refutingPlayerIndex + "&refutingCard=";
         //TODO - none check
-        if (this.state.refutingCardIndex.card_type == -1 && this.state.refutingCardIndex.index == -1) {
+        if (isNone(this.state.refutingCardIndex)) { 
             data += "None";
         }
         else {
@@ -559,10 +563,9 @@ class RefutingCardSelector extends React.Component<RefutingCardSelectorProps, {}
     render = () => {
         let options = [];
         let invalidSelectedCard = true;
-        //TODO - use a constant for this "-1 -1" stuff (and similar CardIndex)
-        options.push(<option value="-1 -1" key="-1">None/Unknown</option>);
+        options.push(<option value={NONE_CARD_INDEX.card_type + " " + NONE_CARD_INDEX.index} key = "-1" > None / Unknown</option >);
         let selectedCardIndexString = this.props.cardIndex.card_type + ' ' + this.props.cardIndex.index;
-        if (selectedCardIndexString == "-1 -1") {
+        if (isNone(this.props.cardIndex)) {
             invalidSelectedCard = false;
         }
         for (let i = 0; i < this.props.cardIndices.length; ++i) {
@@ -577,8 +580,7 @@ class RefutingCardSelector extends React.Component<RefutingCardSelectorProps, {}
         if (invalidSelectedCard) {
             // this happens if there's a selected refuting card, and then
             // the choices change so this isn't an option anymore
-            //TODO none
-            this.props.setCardIndex({ card_type: -1, index: -1 });
+            this.props.setCardIndex(NONE_CARD_INDEX);
         }
         return <span>Refuting card: <select value={selectedCardIndexString} onChange={this.handleChange}>{options}</select></span>;
     }
@@ -887,8 +889,7 @@ class App extends Component<{}, AppState> {
                 }
             }
         }
-        //TODO none
-        return { card_type: -1, index: -1 };
+        return NONE_CARD_INDEX;
     }
 
     updateInfoFromJson = (json: any, haveEnteredData: boolean) => {
