@@ -633,7 +633,7 @@ interface HistoryWhoOwns {
 type HistoryEvent = HistorySuggestion | HistoryWhoOwns;
 interface HistoryEntry {
     event: HistoryEvent,
-    //TODO -describe
+    // This is an opaque description of the session that's provided and understood by the backing Python script
     session: string,
 }
 
