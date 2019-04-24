@@ -458,8 +458,7 @@ interface SuggestACardState {
 class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState> {
     constructor(props: WhoOwnsACardProps) {
         super(props);
-        //TODO none
-        this.state = { suggestingPlayerIndex: 0, refutingPlayerIndex: -1, cardIndices: [0, 0, 0], refutingCardIndex: { card_type: -1, index: -1 } };
+        this.state = { suggestingPlayerIndex: 0, refutingPlayerIndex: -1, cardIndices: [0, 0, 0], refutingCardIndex: NONE_CARD_INDEX};
     }
     setSuggestingPlayerIndex = (playerIndex: number) => {
         this.setState({suggestingPlayerIndex: playerIndex});
@@ -482,7 +481,6 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
             data += "&card" + (i+1) + "=" + CARD_NAMES[i][this.state.cardIndices[i]].internal;
         }
         data += "&refutingPlayer=" + this.state.refutingPlayerIndex + "&refutingCard=";
-        //TODO - none check
         if (isNone(this.state.refutingCardIndex)) { 
             data += "None";
         }
@@ -783,7 +781,6 @@ interface AppState {
 
 class App extends Component<{}, AppState> {
     constructor(props: {}) {
-        // TODO - is this super() call right?
         super(props);
         // TODO - parse query hash from window.location.hash?
         let playerInfos: Array<PlayerInfo> = [];
@@ -908,7 +905,6 @@ class App extends Component<{}, AppState> {
         let clauseInfos = new Map<number, Array<Array<CardIndex>>>();
         if (jsonClauseInfo) {
             for (let playerIndex in jsonClauseInfo) {
-                //TODO - is this casting right?
                 let playerIndexNumber: number = (playerIndex as unknown) as number;
                 let newClauses : Array<Array<CardIndex>>= [];
                 for (let i = 0; i < jsonClauseInfo[playerIndex].length; ++i) {
