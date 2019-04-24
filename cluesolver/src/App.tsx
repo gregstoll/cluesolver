@@ -156,10 +156,7 @@ interface NumberOfCardsValidatorProps {
 
 class NumberOfCardsValidator extends Component<NumberOfCardsValidatorProps, {}> {
     render = () => {
-        // TODO - do this better?
-        let totalNumberOfCards = this.props.playerInfo.reduce(function (previousValue, currentValue) {
-            return previousValue + currentValue.numberOfCards;
-        }, 0);
+        let totalNumberOfCards = this.props.playerInfo.reduce((previousValue, currentValue) => previousValue + currentValue.numberOfCards, 0);
         let badNumberOfCardsElem = null;
         if (totalNumberOfCards != TOTAL_CARDS_FOR_PLAYERS) {
             badNumberOfCardsElem = <span className="warning">Total number of cards must total {TOTAL_CARDS_FOR_PLAYERS}! (not {totalNumberOfCards})</span>;
@@ -659,7 +656,7 @@ class Simulation extends React.Component<SimulationProps, {}> {
             for (let jsonKey in json.simData) {
                 let key = jsonKey as string;
                 let data : Array<number> = json.simData[key];
-                totalNumberOfSims = data.reduce((previousValue: number, currentValue: number) => previousValue + currentValue, 0);
+                totalNumberOfSims = data.reduce((previousValue, currentValue) => previousValue + currentValue, 0);
                 if (totalNumberOfSims > 0) {
                     simData.set(key, data.map((x: number) => x / totalNumberOfSims));
                 } else {
@@ -897,9 +894,7 @@ class App extends Component<{}, AppState> {
                 playerInfos[i].numberOfCards = json.numCards[i];
             }
         }
-        let totalCards = playerInfos.reduce(function (previousValue: number, currentValue) {
-            return previousValue + currentValue.numberOfCards;
-        }, 0);
+        let totalCards = playerInfos.reduce((previousValue, currentValue) => previousValue + currentValue.numberOfCards, 0);
 
         let jsonClauseInfo = json.clauseInfo;
         let clauseInfos = new Map<number, Array<Array<CardIndex>>>();
