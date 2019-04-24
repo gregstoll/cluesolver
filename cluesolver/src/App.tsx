@@ -824,7 +824,7 @@ class App extends Component<{}, AppState> {
         this.setState({doingSimulation: isDoingSimulation});
     }
 
-    //TODO could be async
+    // could be async
     sendClueRequest = (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => {
         if (!skipWorking) {
             this.setState({working: true});
