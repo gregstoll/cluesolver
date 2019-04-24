@@ -473,8 +473,7 @@ class SuggestACard extends React.Component<WhoOwnsACardProps, SuggestACardState>
         this.setState({refutingCardIndex: cardIndex});
     }
     setCardIndex = (cardIndex: CardIndex) => {
-        // TODO - need to copy?
-        let newCardIndices = this.state.cardIndices;
+        let newCardIndices = this.state.cardIndices.slice(0, this.state.cardIndices.length);
         newCardIndices[cardIndex.card_type] = cardIndex.index;
         this.setState({cardIndices: newCardIndices});
     }
