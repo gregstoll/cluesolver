@@ -21,17 +21,6 @@ const _EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Mis
 function compareCardIndexByCategory(card1: CardIndex, card2: CardIndex) {
     return card1.card_type - card2.card_type;
 }
-function compareInternalCardsByCategory(card1: string, card2: string) {
-  return categoryFromInternalCard(card1) - categoryFromInternalCard(card2);
-}
-function categoryFromInternalCard(card: string) {
-  for (let i = 0; i < _INTERNAL_NAMES.length; ++i) {
-      if (_INTERNAL_NAMES[i].indexOf(card) != -1) {
-          return i;
-      }
-  }
-  return 10;
-}
 interface CardIndex {
     card_type: number,
     index: number
