@@ -1,0 +1,63 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <!-- <meta name="theme-color" content="#000000" /> -->
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <link rel="canonical" href="https://gregstoll.com/cluesolver/"/>
+    <title>Clue Solver</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+  <!--#include virtual="/navbar.html"-->
+        <div class="container">
+        <h1>Clue Solver</h1>
+        <p><a href="#about">About this project</a></p>
+
+        <div id="root"></div>
+
+        <p id="about"><b>About this project:</b> <a href="http://en.wikipedia.org/wiki/Cluedo">Clue</a> (or Cluedo outside of North America) is a game published
+by Hasbro in which players make accusations to try to determine who killed Mr.
+Boddy.  This application takes information about the game (including what cards
+you have and which suggestions are disproved by whom) to figure out who has
+which cards, and thus who the killer is.</p>
+        <p>To get a quick start, load one of these sample clue games and play around with the Game Info and Simulations:</p>
+        <ul>
+            <li>63-QLU.3-ANQIHOLUMG.3-QLU-AMG-ANH-AOI.3QLU-AFECSNBTIHKOGRPMJD.3-QLU.3-QLU.3-QLU.</li>
+            <li>54TNJS-AFECBIHKOLURQPMGD.4-ANSTOJ-FHP.4-ANSTOKJP.3-FNSHTJP-AO-AK.3-FNSHTJP.3-TNJS. (the simulation for this one has lots of colors :-) )</li>
+        </ul>
+        <p>The front-end was developed using <a href="https://facebook.github.io/react/">React</a>, the back-end is written in Python, and
+        they communicate in the <a href="http://json.org">JSON</a> data format.  A previous version of this <a href="/cluesolver_gwt/">used the Google Web Toolkit</a>.</p>
+        <p>I originally tried to write the back-end using first-order logic (see
+<a href="https://gregstoll.wordpress.com/tag/cluesolver">discussions on my
+blog</a>), and then propositional logic, but ended up rolling my own
+deduction, which was sort of disappointing.</p>
+        <p>The simulations are only reliable to within a few percent (it only
+does 2000 of them) - basically it chooses each possible solution, tries to
+assign cards to each player and sees if the solution is consistent or not (and if so, counts it).</p>
+        <p>The images on the Game Info tab are taken from the <a href="http://www.famfamfam.com/lab/icons/silk/">Silk icon set at famfamfam.com</a> - thanks!</p>
+        <p>Clue is a registered trademark of Hasbro, inc.  <a href="http://www.hasbro.com/games/parkerbrothers/clue/">Official Clue site</a></p>
+        <p>The source files are <a href="https://github.com/gregstoll/cluesolver">available on GitHub</a>. The backend scripts are:</p>
+        <ul>
+            <li><a href="https://github.com/gregstoll/cluesolver/blob/master/clueengine.py">clueengine.py</a> - the Python backend that does the deductions and simulations.</li>
+            <li><a href="https://github.com/gregstoll/cluesolver/blob/master/clue.py">clue.py</a> - the CGI script that handles communications between the frontend and cluesolver.py.</li>
+        </ul>
+  
+  <p><a href="https://github.com/gregstoll/cluesolver"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/365986a132ccd6a44c23a9169022c0b5c890c387/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f7265645f6161303030302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png"></a></p>
+
+        <!--#include virtual="/endOfBody.html"-->
+    </div>
+  </body>
+</html>
