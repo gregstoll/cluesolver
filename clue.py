@@ -6,12 +6,12 @@ import clueengine
 from functools import reduce
 
 def error(s):
-    print("Content-type: application/json\n\n")
+    print("Content-type: application/json\n")
     print('{"errorStatus": 1, "errorText": "%s"}' % s)
     sys.exit(0)
 
 def success(s):
-    print("Content-type: application/json\n\n")
+    print("Content-type: application/json\n")
     print('{"errorStatus": 0, %s}' % s)
     sys.exit(0)
 
