@@ -4,8 +4,7 @@ import "react-tabs/style/react-tabs.css";
 import './App.css';
 import { isNullOrUndefined, isNull, isUndefined } from 'util';
 
-//TODO - for dev only
-const SCRIPT_NAME = "https://gregstoll.dyndns.org/cluesolver/clue.cgi";
+const SCRIPT_NAME = "clue.cgi";
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 6;
 const MIN_CARDS = 3;
