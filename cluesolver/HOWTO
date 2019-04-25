@@ -1,0 +1,14 @@
+npm run build - do production build
+ - make sure to chmod +x build/index.html
+ - other changes to build/index.html:
+   - add 
+ <link rel="stylesheet" href="/bootstrap.min.css">
+  <script src="/jquery-3.3.1.min.js"></script>
+  <script src="/bootstrap.min.js" defer></script>
+     in head section
+ - add
+  <!--#include virtual="/navbar.html"-->
+   right after </noscript>
+ - add
+  <!--#include virtual="/endOfBody.html"-->
+   right before </body>
