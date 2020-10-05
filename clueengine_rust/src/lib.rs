@@ -31,8 +31,9 @@ enum Card {
     Lounge,
     BilliardRoom
 }
+const CARD_LAST : i32 = (Card::BilliardRoom as i32) + 1;
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, FromPrimitive)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
 enum CardType {
     Suspect = 0,
     Weapon = 6,
@@ -70,7 +71,7 @@ impl PlayerData {
 
         let mut num_cards_to_write = self.num_cards;
         // Always write one digit for simplicity
-        // TODO - what does -1 mean anyway?
+        // TODO - what does -1 mean anyway?  (maybe unknown?)
         if num_cards_to_write == -1 {
             num_cards_to_write = 0;
         }
@@ -125,6 +126,15 @@ impl ClueEngine {
             return CardType::Weapon;
         }
         return CardType::Room;
+    }
+
+    fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
+        let int_range = match card_type {
+            CardType::Suspect => (CardType::Suspect as u8)..(CardType::Weapon as u8),
+            CardType::Weapon => (CardType::Weapon as u8)..(CardType::Room as u8),
+            CardType::Room => (CardType::Room as u8)..(CARD_LAST as u8),
+        };
+        return int_range.map(|x| FromPrimitive::from_u8(x).unwrap());
     }
     
     fn card_set_to_sorted_string(card_set: &CardSet) -> String {
@@ -213,6 +223,24 @@ mod tests {
         assert_eq!("ABC", ClueEngine::card_set_to_sorted_string(&vec![Card::ColonelMustard, Card::ProfessorPlum, Card::MrGreen].into_iter().collect()));
         assert_eq!("", ClueEngine::card_set_to_sorted_string(&HashSet::new()));
         assert_eq!("CLU", ClueEngine::card_set_to_sorted_string(&vec![Card::BilliardRoom, Card::Wrench, Card::MrGreen].into_iter().collect()));
+    }
+
+    #[test]
+    fn test_cards_of_type_suspect() {
+        let expected = vec![Card::ProfessorPlum, Card::ColonelMustard, Card::MrGreen, Card::MissScarlet, Card::MsWhite, Card::MrsPeacock];
+        assert_eq!(expected, ClueEngine::cards_of_type(CardType::Suspect).collect::<Vec<Card>>());
+    }
+
+    #[test]
+    fn test_cards_of_type_weapon() {
+        let expected = vec![Card::Knife, Card::Candlestick, Card::Revolver, Card::LeadPipe, Card::Rope, Card::Wrench];
+        assert_eq!(expected, ClueEngine::cards_of_type(CardType::Weapon).collect::<Vec<Card>>());
+    }
+
+    #[test]
+    fn test_cards_of_type_room() {
+        let expected = vec![Card::Hall, Card::Conservatory, Card::DiningRoom, Card::Kitchen, Card::Study, Card::Library, Card::Ballroom, Card::Lounge, Card::BilliardRoom];
+        assert_eq!(expected, ClueEngine::cards_of_type(CardType::Room).collect::<Vec<Card>>());
     }
 
     #[test]
