@@ -160,9 +160,11 @@ impl ClueEngine {
 
     fn write_to_string(self: &ClueEngine) -> String {
         let mut s = String::from("");
-        s += &self.player_data.len().to_string();
-        // TODO - finish
-        s
+        s += &(self.player_data.len() - 1).to_string();
+        for &player in self.player_data.iter() {
+            s += player.write_to_string();
+        }
+        return s;
     }
 }
 
