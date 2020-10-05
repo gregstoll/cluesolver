@@ -214,4 +214,35 @@ mod tests {
         assert_eq!("", ClueEngine::card_set_to_sorted_string(&HashSet::new()));
         assert_eq!("CLU", ClueEngine::card_set_to_sorted_string(&vec![Card::BilliardRoom, Card::Wrench, Card::MrGreen].into_iter().collect()));
     }
+
+    #[test]
+    fn test_number_of_cards() {
+        // solution files
+        assert_eq!(3, ClueEngine::number_of_player_cards(3, 3));
+        assert_eq!(3, ClueEngine::number_of_player_cards(4, 4));
+        assert_eq!(3, ClueEngine::number_of_player_cards(5, 5));
+        assert_eq!(3, ClueEngine::number_of_player_cards(6, 6));
+
+        assert_eq!(6, ClueEngine::number_of_player_cards(0, 3));
+        assert_eq!(6, ClueEngine::number_of_player_cards(1, 3));
+        assert_eq!(6, ClueEngine::number_of_player_cards(2, 3));
+
+        assert_eq!(5, ClueEngine::number_of_player_cards(0, 4));
+        assert_eq!(5, ClueEngine::number_of_player_cards(1, 4));
+        assert_eq!(4, ClueEngine::number_of_player_cards(2, 4));
+        assert_eq!(4, ClueEngine::number_of_player_cards(3, 4));
+
+        assert_eq!(4, ClueEngine::number_of_player_cards(0, 5));
+        assert_eq!(4, ClueEngine::number_of_player_cards(1, 5));
+        assert_eq!(4, ClueEngine::number_of_player_cards(2, 5));
+        assert_eq!(3, ClueEngine::number_of_player_cards(3, 5));
+        assert_eq!(3, ClueEngine::number_of_player_cards(4, 5));
+
+        assert_eq!(3, ClueEngine::number_of_player_cards(0, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(1, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(2, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(3, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(4, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(5, 6));
+    }
 }
