@@ -1,6 +1,6 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use std::collections::HashSet;
+use std::{collections::HashSet, iter::Peekable, str::Chars};
 use std::iter::FromIterator;
 
 type CardSet = HashSet<Card>;
@@ -41,6 +41,58 @@ enum CardType {
     Room  = 12
 }
  
+// https://wduquette.github.io/parsing-strings-into-slices/
+/// The Tokenizer type.  
+#[derive(Clone,Debug)]
+pub struct Tokenizer<'a> {
+    // The string being parsed.
+    input: &'a str,
+
+    // The starting index of the next character.
+    index: usize,
+
+    // The iterator used to extract characters from the input
+    chars: Peekable<Chars<'a>>,
+}
+
+
+impl<'a> Tokenizer<'a> {
+    /// Creates a new tokenizer for the given input.
+    pub fn new(input: &'a str) -> Self {
+        Self {
+            input,
+            index: 0,
+            chars: input.chars().peekable(),
+        }
+    }
+
+    // Returns the remainder of the input starting at the index.
+    pub fn as_str(&self) -> &str {
+        &self.input[self.index..]
+    }
+
+    /// Returns the next character and updates the index.
+    pub fn next(&mut self) -> Option<char> {
+        let ch = self.chars.next();
+
+        if let Some(c) = ch {
+            self.index += c.len_utf8();
+        }
+
+        ch
+    }
+
+    pub fn next_digit(&mut self) -> u8 {
+        return self.next().unwrap().to_digit(10).unwrap() as u8;
+    }
+
+    /// Returns the next character without advancing
+    pub fn peek(&mut self) -> Option<&char> {
+        return self.chars.peek();
+    }
+}
+
+
 pub struct PlayerData {
     // A set of cards that the player is known to have
     has_cards: CardSet,
@@ -88,45 +140,41 @@ impl PlayerData {
         return s;
     }
 
-    fn load_from_string(self: &mut PlayerData, mut s: &str) {
+    fn load_from_string(self: &mut PlayerData, tokenizer: &mut Tokenizer) {
         // TODO - do we need to pass stuff back to the ClueEngine to update things?
         // seems like this shouldn't need any resolving or anything
-        self.num_cards = s[0..1].parse::<i8>().unwrap();
+        self.num_cards = tokenizer.next_digit() as i8;
         if self.num_cards == 0 {
             self.num_cards = -1;
         }
-        s = &s[1..];
         // Load the list of cards this player has
         // TODO - this string manipulation could maybe be refactored/improved?
-        while s.chars().next().unwrap() != '-' {
-            self.info_on_card(ClueEngine::card_from_char(s.chars().next().unwrap()), true);
-            s = &s[1..];
+        while *tokenizer.peek().unwrap() != '-' {
+            self.info_on_card(ClueEngine::card_from_char(tokenizer.next().unwrap()), true);
         }
-        s = &s[1..];
+        // advance past the '-'
+        tokenizer.next();
         // Load the list of cards this player doesn't have
         {
-            let mut next_char = s.chars().next().unwrap();
+            let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                self.info_on_card(ClueEngine::card_from_char(s.chars().next().unwrap()), true);
-                s = &s[1..];
-                next_char = s.chars().next().unwrap();
+                self.info_on_card(ClueEngine::card_from_char(tokenizer.next().unwrap()), true);
+                next_char = *tokenizer.peek().unwrap();
             }
         }
         // Load the list of clauses as long as it's not done
-        while s.chars().next().unwrap() != '.' {
-            s = &s[1..];
+        // TODO - assert this is '-' if it's not '.'?
+        while tokenizer.next().unwrap() != '.' {
             let mut clause = HashSet::new();
-            let mut next_char = s.chars().next().unwrap();
+            let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                clause.insert(ClueEngine::card_from_char(next_char));
-                s = &s[1..];
-                next_char = s.chars().next().unwrap();
+                clause.insert(ClueEngine::card_from_char(tokenizer.next().unwrap()));
+                next_char = *tokenizer.peek().unwrap();
             }
             if !clause.is_empty() {
                 self.has_one_of_cards(clause);
             }
         }
-        s = &s[1..];
     }
 
     fn has_one_of_cards(self: &mut PlayerData, cards: CardSet) -> CardSet {
@@ -162,6 +210,16 @@ impl PlayerData {
             updated_cards.iter().for_each(|c| {changed_cards.insert(*c);});
         }
         return changed_cards;
+    }
+
+    fn has_card(self: &PlayerData, card: Card) -> Option<bool> {
+        if self.has_cards.contains(&card) {
+            return Some(true);
+        }
+        if self.not_has_cards.contains(&card) {
+            return Some(false);
+        }
+        return None;
     }
 
     // TODO - updateClueEngine stuff?
@@ -296,13 +354,13 @@ impl ClueEngine {
         return s;
     }
 
-    fn load_from_string(mut s: &str) -> ClueEngine {
-        let number_of_players = s[0..1].parse::<u8>().unwrap();
+    fn load_from_string(s: &str) -> ClueEngine {
+        let mut tokenizer = Tokenizer::new(s);
+        let number_of_players = tokenizer.next_digit();
         let mut clue_engine = ClueEngine::new(number_of_players);
-        s = &s[1..];
         for i in 0..(number_of_players+1) {
-            let mut player = &mut clue_engine.player_data[i as usize];
-            player.load_from_string(s);
+            let player = &mut clue_engine.player_data[i as usize];
+            player.load_from_string(&mut tokenizer);
         }
         return clue_engine;
     }
@@ -477,12 +535,26 @@ mod tests {
     fn test_load_from_string_simple() {
         let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
         assert_eq!(3, clue_engine.player_data.len());
-        //TODO - write PlayerData::has_card() that returns an Option<bool> here
+        assert_eq!(9, clue_engine.player_data[0].num_cards);
+        assert_eq!(false, clue_engine.player_data[0].is_solution_player);
         assert_eq!(1, clue_engine.player_data[0].has_cards.len());
-        assert!(clue_engine.player_data[0].has_cards.contains(&Card::ProfessorPlum));
+        assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
         assert_eq!(0, clue_engine.player_data[0].not_has_cards.len());
         assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
-        //TODO - finish
+
+        assert_eq!(9, clue_engine.player_data[1].num_cards);
+        assert_eq!(false, clue_engine.player_data[1].is_solution_player);
+        assert_eq!(0, clue_engine.player_data[1].has_cards.len());
+        //TODO - this should be 1 once we're doing inference correctly
+        assert_eq!(0, clue_engine.player_data[1].not_has_cards.len());
+        assert_eq!(0, clue_engine.player_data[1].possible_cards.len());
+
+        assert_eq!(3, clue_engine.player_data[2].num_cards);
+        assert_eq!(true, clue_engine.player_data[2].is_solution_player);
+        assert_eq!(0, clue_engine.player_data[2].has_cards.len());
+        //TODO - this should be 1 once we're doing inference correctly
+        assert_eq!(0, clue_engine.player_data[2].not_has_cards.len());
+        assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
     }
 
 
