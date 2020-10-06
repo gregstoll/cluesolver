@@ -295,6 +295,17 @@ impl ClueEngine {
         }
         return s;
     }
+
+    fn load_from_string(mut s: &str) -> ClueEngine {
+        let number_of_players = s[0..1].parse::<u8>().unwrap();
+        let mut clue_engine = ClueEngine::new(number_of_players);
+        s = &s[1..];
+        for i in 0..(number_of_players+1) {
+            let mut player = &mut clue_engine.player_data[i as usize];
+            player.load_from_string(s);
+        }
+        return clue_engine;
+    }
 }
 
 #[cfg(test)]
@@ -460,6 +471,18 @@ mod tests {
         expected.remove(2);
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
+    }
+
+    #[test]
+    fn test_load_from_string_simple() {
+        let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
+        assert_eq!(3, clue_engine.player_data.len());
+        //TODO - write PlayerData::has_card() that returns an Option<bool> here
+        assert_eq!(1, clue_engine.player_data[0].has_cards.len());
+        assert!(clue_engine.player_data[0].has_cards.contains(&Card::ProfessorPlum));
+        assert_eq!(0, clue_engine.player_data[0].not_has_cards.len());
+        assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
+        //TODO - finish
     }
 
 
