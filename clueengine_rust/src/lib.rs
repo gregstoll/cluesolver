@@ -88,7 +88,83 @@ impl PlayerData {
         return s;
     }
 
-    // TODO - updateClueEngine stuff
+    fn load_from_string(self: &mut PlayerData, mut s: &str) {
+        // TODO - do we need to pass stuff back to the ClueEngine to update things?
+        // seems like this shouldn't need any resolving or anything
+        self.num_cards = s[0..1].parse::<i8>().unwrap();
+        if self.num_cards == 0 {
+            self.num_cards = -1;
+        }
+        s = &s[1..];
+        // Load the list of cards this player has
+        // TODO - this string manipulation could maybe be refactored/improved?
+        while s.chars().next().unwrap() != '-' {
+            self.info_on_card(ClueEngine::card_from_char(s.chars().next().unwrap()), true);
+            s = &s[1..];
+        }
+        s = &s[1..];
+        // Load the list of cards this player doesn't have
+        {
+            let mut next_char = s.chars().next().unwrap();
+            while next_char != '-' && next_char != '.' {
+                self.info_on_card(ClueEngine::card_from_char(s.chars().next().unwrap()), true);
+                s = &s[1..];
+                next_char = s.chars().next().unwrap();
+            }
+        }
+        // Load the list of clauses as long as it's not done
+        while s.chars().next().unwrap() != '.' {
+            s = &s[1..];
+            let mut clause = HashSet::new();
+            let mut next_char = s.chars().next().unwrap();
+            while next_char != '-' && next_char != '.' {
+                clause.insert(ClueEngine::card_from_char(next_char));
+                s = &s[1..];
+                next_char = s.chars().next().unwrap();
+            }
+            if !clause.is_empty() {
+                self.has_one_of_cards(clause);
+            }
+        }
+        s = &s[1..];
+    }
+
+    fn has_one_of_cards(self: &mut PlayerData, cards: CardSet) -> CardSet {
+        let mut clause_helpful = true;
+        let mut changed_cards = HashSet::new();
+        let mut new_clause = HashSet::new();
+        //TODO finish
+        for card in cards.iter() {
+            if self.has_cards.contains(card) {
+                // We already know player has one of these cards, so this
+                // clause is worthless.
+                clause_helpful = false;
+            }
+            else if self.not_has_cards.contains(card) {
+                // We know player doesn't have this card, so don't add this card
+                // to the new clause.
+            }
+            else {
+                // Don't know; add it to the new clause
+                new_clause.insert(*card);
+            }
+        }
+        if clause_helpful && !new_clause.is_empty() {
+            if new_clause.len() == 1 {
+                // We have learned player has this card!
+                let new_card = *new_clause.iter().next().unwrap();
+                let other_changed_cards = self.info_on_card(new_card, true);
+                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+            } else {
+                self.possible_cards.push(new_clause);
+            }
+            let updated_cards = self.examine_clauses(None);
+            updated_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+        }
+        return changed_cards;
+    }
+
+    // TODO - updateClueEngine stuff?
     fn info_on_card(self: &mut PlayerData, card: Card, has_card: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
         if has_card {
@@ -103,8 +179,9 @@ impl PlayerData {
         return changed_cards;
     }
 
-    fn examine_clauses(self: &mut PlayerData, card: Card) {
+    fn examine_clauses(self: &mut PlayerData, card: Option<Card>) -> CardSet{
         //TODO
+        return HashSet::new();
     }
 
     fn eliminate_extraneous_clauses(self: &mut PlayerData) {
@@ -124,7 +201,7 @@ impl PlayerData {
                     break 'outer;
                 }
                 else if clause_1.is_superset(clause_2) {
-                    // clause_2 is extraneous
+                    // clause_1 is extraneous
                     possible_cards.remove(i);
                     need_to_call_again = true;
                     break 'outer;
@@ -315,6 +392,7 @@ mod tests {
         assert_eq!(expected, clauses);
     }
 
+    #[test]
     fn test_eliminate_extraneous_clauses_three_not_extraneous() {
         let mut clauses: Vec<CardSet> = vec![
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
@@ -325,6 +403,7 @@ mod tests {
         assert_eq!(expected, clauses);
     }
 
+    #[test]
     fn test_eliminate_extraneous_clauses_superset_first() {
         let mut clauses: Vec<CardSet> = vec![
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
@@ -332,11 +411,12 @@ mod tests {
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Hall])];
         let mut expected = clauses.clone();
-        expected.remove(2);
+        expected.remove(1);
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
     }
 
+    #[test]
     fn test_eliminate_extraneous_clauses_subset_first() {
         let mut clauses: Vec<CardSet> = vec![
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
@@ -344,11 +424,12 @@ mod tests {
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Library, Card::Hall])];
         let mut expected = clauses.clone();
-        expected.remove(1);
+        expected.remove(2);
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
     }
 
+    #[test]
     fn test_eliminate_extraneous_clauses_multiple_redundant_to_same_one() {
         let mut clauses: Vec<CardSet> = vec![
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
@@ -358,12 +439,12 @@ mod tests {
             make_card_set(vec![Card::Wrench, Card::Library]),
             ];
         let mut expected = clauses.clone();
-        expected.remove(4);
-        expected.remove(1);
+        expected.remove(2);
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
     }
 
+    #[test]
     fn test_eliminate_extraneous_clauses_multiple_redundant_to_different_ones() {
         let mut clauses: Vec<CardSet> = vec![
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
@@ -375,13 +456,11 @@ mod tests {
             make_card_set(vec![Card::BilliardRoom, Card::Wrench]),
             ];
         let mut expected = clauses.clone();
-        expected.remove(6);
-        expected.remove(4);
-        expected.remove(1);
+        expected.remove(5);
+        expected.remove(2);
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
     }
-
 
 
     #[test]
