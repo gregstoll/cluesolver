@@ -241,8 +241,7 @@ impl PlayerData {
                 // We have learned player has this card!
                 let new_card = *new_clause.iter().next().unwrap();
                 let other_changed_cards = self.info_on_card(new_card, true);
-                // TODO - add utility method for this
-                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                changed_cards.extend(other_changed_cards.iter());
             } else {
                 self.possible_cards.push(new_clause);
             }
@@ -496,10 +495,8 @@ impl ClueEngine {
                     if !affected_people.contains(&idx) {
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
-                                // TODOTODO
                                 let other_changed_cards = self.player_data[idx as usize].info_on_card(card, false);
-                                // TODO - add utility method for this
-                                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                                changed_cards.extend(other_changed_cards.iter());
                             }
                         }
                     }
