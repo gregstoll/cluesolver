@@ -147,12 +147,13 @@ pub struct PlayerData {
     possible_cards: Vec<CardSet>,
     //clue_engine: &'a ClueEngine<'a>, // TODO - do we really need this?
     is_solution_player: bool,
-    num_cards: i8
+    // None means we don't know how many cards
+    num_cards: Option<u8>
 }
 
 impl PlayerData {
     //fn new(clue_engine: &'a ClueEngine<'a>, num_cards: i8, is_solution_player: bool) -> PlayerData<'a> {
-    fn new(num_cards: i8, is_solution_player: bool) -> PlayerData {
+    fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
         return PlayerData {
             has_cards: HashSet::new(),
             not_has_cards: HashSet::new(),
@@ -166,12 +167,8 @@ impl PlayerData {
     fn write_to_string(self: &PlayerData) -> String {
         let mut s = String::from("");
 
-        let mut num_cards_to_write = self.num_cards;
-        // Always write one digit for simplicity
-        // TODO - what does -1 mean anyway?  (maybe unknown?)
-        if num_cards_to_write == -1 {
-            num_cards_to_write = 0;
-        }
+        let num_cards_to_write = self.num_cards.unwrap_or(0);
+        // Always write 0 instead of None for simplicity
         s += &num_cards_to_write.to_string();
         s += &CardUtils::card_set_to_sorted_string(&self.has_cards);
         s += "-";
@@ -187,10 +184,8 @@ impl PlayerData {
     fn load_from_string(self: &mut PlayerData, tokenizer: &mut Tokenizer) {
         // TODO - do we need to pass stuff back to the ClueEngine to update things?
         // seems like this shouldn't need any resolving or anything
-        self.num_cards = tokenizer.next_digit() as i8;
-        if self.num_cards == 0 {
-            self.num_cards = -1;
-        }
+        let num_cards = tokenizer.next_digit() as u8;
+        self.num_cards = if num_cards == 0 { None } else { Some(num_cards)};
         // Load the list of cards this player has
         while *tokenizer.peek().unwrap() != '-' {
             self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
@@ -328,7 +323,7 @@ impl ClueEngine {
     fn new(number_of_players: u8) -> ClueEngine {
         let mut player_datas: Vec<PlayerData> = vec!();
         for i in 0..(number_of_players + 1) {
-            let player_data = PlayerData::new(ClueEngine::number_of_player_cards(i, number_of_players), i == number_of_players);
+            let player_data = PlayerData::new(Some(ClueEngine::number_of_player_cards(i, number_of_players)), i == number_of_players);
             player_datas.push(player_data);
         }
         let clue_engine = ClueEngine { player_data: player_datas };
@@ -353,7 +348,7 @@ impl ClueEngine {
         &mut self.player_data[len]
     }
 
-    fn number_of_player_cards(player_index: u8, num_players: u8) -> i8 {
+    fn number_of_player_cards(player_index: u8, num_players: u8) -> u8 {
         if player_index == num_players {
             // The case file always has exactly 3 cards
             return 3
@@ -365,7 +360,7 @@ impl ClueEngine {
         if player_index < leftovers {
             num_cards += 1;
         }
-        return num_cards as i8;
+        return num_cards as u8;
     }
 
     fn write_to_string(self: &ClueEngine) -> String {
@@ -685,21 +680,21 @@ mod tests {
         let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
         assert_eq!(3, clue_engine.player_data.len());
         assert_eq!(2, clue_engine.number_of_real_players());
-        assert_eq!(9, clue_engine.player_data[0].num_cards);
+        assert_eq!(Some(9), clue_engine.player_data[0].num_cards);
         assert_eq!(false, clue_engine.player_data[0].is_solution_player);
         assert_eq!(1, clue_engine.player_data[0].has_cards.len());
         assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
         assert_eq!(0, clue_engine.player_data[0].not_has_cards.len());
         assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
 
-        assert_eq!(9, clue_engine.player_data[1].num_cards);
+        assert_eq!(Some(9), clue_engine.player_data[1].num_cards);
         assert_eq!(false, clue_engine.player_data[1].is_solution_player);
         assert_eq!(0, clue_engine.player_data[1].has_cards.len());
         //TODO - this should be 1 once we're doing inference correctly
         assert_eq!(0, clue_engine.player_data[1].not_has_cards.len());
         assert_eq!(0, clue_engine.player_data[1].possible_cards.len());
 
-        assert_eq!(3, clue_engine.player_data[2].num_cards);
+        assert_eq!(Some(3), clue_engine.player_data[2].num_cards);
         assert_eq!(true, clue_engine.player_data[2].is_solution_player);
         assert_eq!(0, clue_engine.player_data[2].has_cards.len());
         //TODO - this should be 1 once we're doing inference correctly
