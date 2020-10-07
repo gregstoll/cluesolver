@@ -486,7 +486,7 @@ impl ClueEngine {
         for (clause, players) in clause_hash.iter() {
             // If n people all have an n-length clause, no one else can have
             // a card in that clause.
-            if (clause.len() <= players.len()) {
+            if clause.len() <= players.len() {
                 let affected_people: HashSet<u8> = HashSet::from_iter(players.iter().map(|x| *x));
                 for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                     changed_cards.insert(card);
