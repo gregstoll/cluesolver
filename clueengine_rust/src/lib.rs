@@ -46,7 +46,43 @@ pub struct CardUtils {
 }
 
 impl CardUtils {
-    // TODO
+    fn card_from_char(ch: char) -> Card {
+        let index = ch as u8 - 'A' as u8;
+        return FromPrimitive::from_u8(index).unwrap()
+    }
+
+    fn char_from_card(card: Card) -> char {
+        let index = card as u8 + 'A' as u8;
+        return index as char;
+    }
+
+    fn card_type(card: Card) -> CardType {
+        let index = card as u8;
+        if index < CardType::Weapon as u8 {
+            return CardType::Suspect;
+        }
+        if index < CardType::Room as u8 {
+            return CardType::Weapon;
+        }
+        return CardType::Room;
+    }
+
+    fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
+        let int_range = match card_type {
+            CardType::Suspect => (CardType::Suspect as u8)..(CardType::Weapon as u8),
+            CardType::Weapon => (CardType::Weapon as u8)..(CardType::Room as u8),
+            CardType::Room => (CardType::Room as u8)..(CARD_LAST as u8),
+        };
+        return int_range.map(|x| FromPrimitive::from_u8(x).unwrap());
+    }
+
+    fn card_set_to_sorted_string(card_set: &CardSet) -> String {
+        let mut chars = card_set.into_iter().map(|card| CardUtils::char_from_card(*card)).collect::<Vec<char>>();
+        chars.sort();
+        return chars.into_iter().collect();
+    }
+
+
 }
 
 // https://wduquette.github.io/parsing-strings-into-slices/
@@ -137,12 +173,12 @@ impl PlayerData {
             num_cards_to_write = 0;
         }
         s += &num_cards_to_write.to_string();
-        s += &ClueEngine::card_set_to_sorted_string(&self.has_cards);
+        s += &CardUtils::card_set_to_sorted_string(&self.has_cards);
         s += "-";
-        s += &ClueEngine::card_set_to_sorted_string(&self.not_has_cards);
+        s += &CardUtils::card_set_to_sorted_string(&self.not_has_cards);
         for possible_card_group in (&self.possible_cards).into_iter() {
             s += "-";
-            s += &ClueEngine::card_set_to_sorted_string(&possible_card_group);
+            s += &CardUtils::card_set_to_sorted_string(&possible_card_group);
         }
         s += ".";
         return s;
@@ -157,7 +193,7 @@ impl PlayerData {
         }
         // Load the list of cards this player has
         while *tokenizer.peek().unwrap() != '-' {
-            self.info_on_card(ClueEngine::card_from_char(tokenizer.next().unwrap()), true);
+            self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
         }
         // advance past the '-'
         tokenizer.next();
@@ -165,7 +201,7 @@ impl PlayerData {
         {
             let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                self.info_on_card(ClueEngine::card_from_char(tokenizer.next().unwrap()), true);
+                self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
                 next_char = *tokenizer.peek().unwrap();
             }
         }
@@ -175,7 +211,7 @@ impl PlayerData {
             let mut clause = HashSet::new();
             let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                clause.insert(ClueEngine::card_from_char(tokenizer.next().unwrap()));
+                clause.insert(CardUtils::card_from_char(tokenizer.next().unwrap()));
                 next_char = *tokenizer.peek().unwrap();
             }
             if !clause.is_empty() {
@@ -317,42 +353,6 @@ impl ClueEngine {
         &mut self.player_data[len]
     }
 
-    fn card_from_char(ch: char) -> Card {
-        let index = ch as u8 - 'A' as u8;
-        return FromPrimitive::from_u8(index).unwrap()
-    }
-
-    fn char_from_card(card: Card) -> char {
-        let index = card as u8 + 'A' as u8;
-        return index as char;
-    }
-
-    fn card_type(card: Card) -> CardType {
-        let index = card as u8;
-        if index < CardType::Weapon as u8 {
-            return CardType::Suspect;
-        }
-        if index < CardType::Room as u8 {
-            return CardType::Weapon;
-        }
-        return CardType::Room;
-    }
-
-    fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
-        let int_range = match card_type {
-            CardType::Suspect => (CardType::Suspect as u8)..(CardType::Weapon as u8),
-            CardType::Weapon => (CardType::Weapon as u8)..(CardType::Room as u8),
-            CardType::Room => (CardType::Room as u8)..(CARD_LAST as u8),
-        };
-        return int_range.map(|x| FromPrimitive::from_u8(x).unwrap());
-    }
-
-    fn card_set_to_sorted_string(card_set: &CardSet) -> String {
-        let mut chars = card_set.into_iter().map(|card| ClueEngine::char_from_card(*card)).collect::<Vec<char>>();
-        chars.sort();
-        return chars.into_iter().collect();
-    }
-
     fn number_of_player_cards(player_index: u8, num_players: u8) -> i8 {
         if player_index == num_players {
             // The case file always has exactly 3 cards
@@ -439,7 +439,7 @@ impl ClueEngine {
         }
 
         for card_type in ALL_CARD_TYPES.iter() {
-            let all_cards = ClueEngine::cards_of_type(*card_type).collect::<Vec<Card>>();
+            let all_cards = CardUtils::cards_of_type(*card_type).collect::<Vec<Card>>();
             let mut solution_card: Option<Card> = None;
             let mut is_solution = true;
             for test_card in all_cards.iter() {
@@ -480,7 +480,7 @@ impl ClueEngine {
         for idx in 0..self.number_of_real_players() {
             let player = &self.player_data[idx as usize];
             for clause in player.possible_cards.iter() {
-                let clause_str = ClueEngine::card_set_to_sorted_string(clause);
+                let clause_str = CardUtils::card_set_to_sorted_string(clause);
                 if clause_hash.contains_key(&clause_str) {
                     clause_hash.get_mut(&clause_str).unwrap().push(idx);
                 }
@@ -494,12 +494,12 @@ impl ClueEngine {
             // a card in that clause.
             if (clause.len() <= players.len()) {
                 let affected_people: HashSet<u8> = HashSet::from_iter(players.iter().map(|x| *x));
-                for card in clause.chars().map(|ch| ClueEngine::card_from_char(ch)) {
+                for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                     changed_cards.insert(card);
                 }
                 for idx in 0..(self.number_of_real_players() + 1) {
                     if !affected_people.contains(&idx) {
-                        for card in clause.chars().map(|ch| ClueEngine::card_from_char(ch)) {
+                        for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
                                 // TODOTODO
                                 let other_changed_cards = self.player_data[idx as usize].info_on_card(card, false);
@@ -521,75 +521,75 @@ mod tests {
 
     #[test]
     fn test_char_from_card() {
-        assert_eq!('A', ClueEngine::char_from_card(Card::ProfessorPlum));
-        assert_eq!('B', ClueEngine::char_from_card(Card::ColonelMustard));
-        assert_eq!('F', ClueEngine::char_from_card(Card::MrsPeacock));
-        assert_eq!('G', ClueEngine::char_from_card(Card::Knife));
-        assert_eq!('L', ClueEngine::char_from_card(Card::Wrench));
-        assert_eq!('M', ClueEngine::char_from_card(Card::Hall));
-        assert_eq!('U', ClueEngine::char_from_card(Card::BilliardRoom));
+        assert_eq!('A', CardUtils::char_from_card(Card::ProfessorPlum));
+        assert_eq!('B', CardUtils::char_from_card(Card::ColonelMustard));
+        assert_eq!('F', CardUtils::char_from_card(Card::MrsPeacock));
+        assert_eq!('G', CardUtils::char_from_card(Card::Knife));
+        assert_eq!('L', CardUtils::char_from_card(Card::Wrench));
+        assert_eq!('M', CardUtils::char_from_card(Card::Hall));
+        assert_eq!('U', CardUtils::char_from_card(Card::BilliardRoom));
         for i in ('A' as u8)..('V' as u8) {
             let ch = i as char;
-            assert_eq!(ch, ClueEngine::char_from_card(ClueEngine::card_from_char(ch)));
+            assert_eq!(ch, CardUtils::char_from_card(CardUtils::card_from_char(ch)));
         }
     }
 
     #[test]
     #[should_panic]
     fn test_card_from_char_on_char_below_a__panics() {
-        let _ch = ClueEngine::card_from_char('0');
+        let _ch = CardUtils::card_from_char('0');
     }
     #[test]
     #[should_panic]
     fn test_card_from_char_on_char_above_u__panics() {
-        let _ch = ClueEngine::card_from_char('V');
+        let _ch = CardUtils::card_from_char('V');
     }
 
     #[test]
     fn test_card_from_char() {
-        assert_eq!(Card::ProfessorPlum, ClueEngine::card_from_char('A'));
-        assert_eq!(Card::ColonelMustard, ClueEngine::card_from_char('B'));
-        assert_eq!(Card::MrsPeacock, ClueEngine::card_from_char('F'));
-        assert_eq!(Card::Knife, ClueEngine::card_from_char('G'));
-        assert_eq!(Card::Wrench, ClueEngine::card_from_char('L'));
-        assert_eq!(Card::Hall, ClueEngine::card_from_char('M'));
-        assert_eq!(Card::BilliardRoom, ClueEngine::card_from_char('U'));
+        assert_eq!(Card::ProfessorPlum, CardUtils::card_from_char('A'));
+        assert_eq!(Card::ColonelMustard, CardUtils::card_from_char('B'));
+        assert_eq!(Card::MrsPeacock, CardUtils::card_from_char('F'));
+        assert_eq!(Card::Knife, CardUtils::card_from_char('G'));
+        assert_eq!(Card::Wrench, CardUtils::card_from_char('L'));
+        assert_eq!(Card::Hall, CardUtils::card_from_char('M'));
+        assert_eq!(Card::BilliardRoom, CardUtils::card_from_char('U'));
     }
  
     #[test]
     fn test_card_type() {
-        assert_eq!(CardType::Suspect, ClueEngine::card_type(Card::ProfessorPlum));
-        assert_eq!(CardType::Suspect, ClueEngine::card_type(Card::ColonelMustard));
-        assert_eq!(CardType::Suspect, ClueEngine::card_type(Card::MrsPeacock));
-        assert_eq!(CardType::Weapon, ClueEngine::card_type(Card::Knife));
-        assert_eq!(CardType::Weapon, ClueEngine::card_type(Card::Wrench));
-        assert_eq!(CardType::Room, ClueEngine::card_type(Card::Hall));
-        assert_eq!(CardType::Room, ClueEngine::card_type(Card::BilliardRoom));
+        assert_eq!(CardType::Suspect, CardUtils::card_type(Card::ProfessorPlum));
+        assert_eq!(CardType::Suspect, CardUtils::card_type(Card::ColonelMustard));
+        assert_eq!(CardType::Suspect, CardUtils::card_type(Card::MrsPeacock));
+        assert_eq!(CardType::Weapon, CardUtils::card_type(Card::Knife));
+        assert_eq!(CardType::Weapon, CardUtils::card_type(Card::Wrench));
+        assert_eq!(CardType::Room, CardUtils::card_type(Card::Hall));
+        assert_eq!(CardType::Room, CardUtils::card_type(Card::BilliardRoom));
     }
 
     #[test]
     fn test_card_set_to_sorted_string() {
-        assert_eq!("ABC", ClueEngine::card_set_to_sorted_string(&vec![Card::ColonelMustard, Card::ProfessorPlum, Card::MrGreen].into_iter().collect()));
-        assert_eq!("", ClueEngine::card_set_to_sorted_string(&HashSet::new()));
-        assert_eq!("CLU", ClueEngine::card_set_to_sorted_string(&vec![Card::BilliardRoom, Card::Wrench, Card::MrGreen].into_iter().collect()));
+        assert_eq!("ABC", CardUtils::card_set_to_sorted_string(&vec![Card::ColonelMustard, Card::ProfessorPlum, Card::MrGreen].into_iter().collect()));
+        assert_eq!("", CardUtils::card_set_to_sorted_string(&HashSet::new()));
+        assert_eq!("CLU", CardUtils::card_set_to_sorted_string(&vec![Card::BilliardRoom, Card::Wrench, Card::MrGreen].into_iter().collect()));
     }
 
     #[test]
     fn test_cards_of_type_suspect() {
         let expected = vec![Card::ProfessorPlum, Card::ColonelMustard, Card::MrGreen, Card::MissScarlet, Card::MsWhite, Card::MrsPeacock];
-        assert_eq!(expected, ClueEngine::cards_of_type(CardType::Suspect).collect::<Vec<Card>>());
+        assert_eq!(expected, CardUtils::cards_of_type(CardType::Suspect).collect::<Vec<Card>>());
     }
 
     #[test]
     fn test_cards_of_type_weapon() {
         let expected = vec![Card::Knife, Card::Candlestick, Card::Revolver, Card::LeadPipe, Card::Rope, Card::Wrench];
-        assert_eq!(expected, ClueEngine::cards_of_type(CardType::Weapon).collect::<Vec<Card>>());
+        assert_eq!(expected, CardUtils::cards_of_type(CardType::Weapon).collect::<Vec<Card>>());
     }
 
     #[test]
     fn test_cards_of_type_room() {
         let expected = vec![Card::Hall, Card::Conservatory, Card::DiningRoom, Card::Kitchen, Card::Study, Card::Library, Card::Ballroom, Card::Lounge, Card::BilliardRoom];
-        assert_eq!(expected, ClueEngine::cards_of_type(CardType::Room).collect::<Vec<Card>>());
+        assert_eq!(expected, CardUtils::cards_of_type(CardType::Room).collect::<Vec<Card>>());
     }
     #[test]
     fn test_eliminate_extraneous_clauses_empty() {
