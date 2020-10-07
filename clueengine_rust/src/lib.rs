@@ -1,6 +1,6 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use std::{collections::HashSet, iter::Peekable, str::Chars};
+use std::{collections::HashSet, collections::HashMap, iter::Peekable, str::Chars};
 use std::iter::FromIterator;
 
 type CardSet = HashSet<Card>;
@@ -34,13 +34,21 @@ enum Card {
 }
 const CARD_LAST : i32 = (Card::BilliardRoom as i32) + 1;
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Hash, Copy, Clone)]
 enum CardType {
     Suspect = 0,
     Weapon = 6,
     Room  = 12
 }
+const ALL_CARD_TYPES: [CardType; 3] = [CardType::Suspect, CardType::Weapon, CardType::Room];
  
+pub struct CardUtils {
+}
+
+impl CardUtils {
+    // TODO
+}
+
 // https://wduquette.github.io/parsing-strings-into-slices/
 /// The Tokenizer type.  
 #[derive(Clone,Debug)]
@@ -148,7 +156,6 @@ impl PlayerData {
             self.num_cards = -1;
         }
         // Load the list of cards this player has
-        // TODO - this string manipulation could maybe be refactored/improved?
         while *tokenizer.peek().unwrap() != '-' {
             self.info_on_card(ClueEngine::card_from_char(tokenizer.next().unwrap()), true);
         }
@@ -177,6 +184,7 @@ impl PlayerData {
         }
     }
 
+    //TODO - need a better naming scheme
     fn has_one_of_cards(self: &mut PlayerData, cards: CardSet) -> CardSet {
         let mut clause_helpful = true;
         let mut changed_cards = HashSet::new();
@@ -202,6 +210,7 @@ impl PlayerData {
                 // We have learned player has this card!
                 let new_card = *new_clause.iter().next().unwrap();
                 let other_changed_cards = self.info_on_card(new_card, true);
+                // TODO - add utility method for this
                 other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
             } else {
                 self.possible_cards.push(new_clause);
@@ -294,6 +303,20 @@ impl ClueEngine {
         return clue_engine;
     }
 
+    fn number_of_real_players(self: &Self) -> u8 {
+        // don't include the solution player
+        return (self.player_data.len() - 1) as u8;
+    }
+
+    fn solution_player(self: &Self) -> &PlayerData {
+        &self.player_data[self.player_data.len()]
+    }
+
+    fn solution_player_mut(self: &mut Self) -> &mut PlayerData {
+        let len = self.player_data.len();
+        &mut self.player_data[len]
+    }
+
     fn card_from_char(ch: char) -> Card {
         let index = ch as u8 - 'A' as u8;
         return FromPrimitive::from_u8(index).unwrap()
@@ -323,7 +346,7 @@ impl ClueEngine {
         };
         return int_range.map(|x| FromPrimitive::from_u8(x).unwrap());
     }
-    
+
     fn card_set_to_sorted_string(card_set: &CardSet) -> String {
         let mut chars = card_set.into_iter().map(|card| ClueEngine::char_from_card(*card)).collect::<Vec<char>>();
         chars.sort();
@@ -347,7 +370,7 @@ impl ClueEngine {
 
     fn write_to_string(self: &ClueEngine) -> String {
         let mut s = String::from("");
-        s += &(self.player_data.len() - 1).to_string();
+        s += &(self.number_of_real_players()).to_string();
         for player in self.player_data.iter() {
             s += &player.write_to_string();
         }
@@ -363,6 +386,132 @@ impl ClueEngine {
             player.load_from_string(&mut tokenizer);
         }
         return clue_engine;
+    }
+    
+    // TODO - document this
+    fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
+        // TODO - this method is really long
+        let mut changed_cards: CardSet = HashSet::new();
+        if let Some(real_card) = card {
+            let mut someone_has_card = false;
+            let mut skip_deduction = false;
+            let mut number_who_dont_have_card = 0;
+            let mut player_who_might_have_card = None;
+            // - Check also for all cards except one in a category are
+            // accounted for.
+            for i in 0..self.player_data.len() {
+                let player = &mut self.player_data[i];
+                let has_card = player.has_card(real_card);
+                match has_card {
+                    Some(true) => {
+                        // Someone has the card, so the solution is not this.
+                        someone_has_card = true;
+                        break;
+                    },
+                    Some(false) => {
+                        number_who_dont_have_card += 1;
+                    },
+                    None => {
+                        if player_who_might_have_card == None {
+                            player_who_might_have_card = Some(i);
+                        } else {
+                            // The solution is not this, but someone might still
+                            // have it.
+                            skip_deduction = true;
+                        }
+                    }
+                }
+            }
+            if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
+                // Every player except one doesn't have this card, so we know the player has it.
+                let other_changed_cards = self.player_data[player_who_might_have_card.unwrap()].info_on_card(real_card, true);
+                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+            }
+            else if someone_has_card {
+                // Someone has this card, so no one else does. (including solution)
+                for player in self.player_data.iter_mut() {
+                    if player.has_card(real_card) == None {
+                        let other_changed_cards = player.info_on_card(real_card, false);
+                        other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                    }
+                }
+            }
+        }
+
+        for card_type in ALL_CARD_TYPES.iter() {
+            let all_cards = ClueEngine::cards_of_type(*card_type).collect::<Vec<Card>>();
+            let mut solution_card: Option<Card> = None;
+            let mut is_solution = true;
+            for test_card in all_cards.iter() {
+                // See if anyone has this card
+                let mut card_owned = false;
+                for player in self.player_data.iter() {
+                    if player.has_card(*test_card) == Some(true) {
+                        // someone has it, mark it as such
+                        card_owned = true;
+                    }
+                }
+                if !card_owned {
+                    // If there's another possibility, we don't know which is
+                    // right.
+                    if solution_card != None {
+                        solution_card = None;
+                        is_solution = false;
+                    } else {
+                        solution_card = Some(*test_card);
+                    }
+                }
+            }
+            if is_solution && solution_card != None {
+                // There's only one possibility, so this must be it!
+                let solution = solution_card.unwrap();
+                if self.solution_player().has_card(solution) == None {
+                    // also check to make sure we don't have another one in this category
+                    // TODO - should we assert if this happens?
+                    if all_cards.iter().all(|c| !self.solution_player().has_cards.contains(c)) {
+                        self.solution_player_mut().has_cards.insert(solution);
+                        changed_cards.insert(solution);
+                    }
+                }
+            }
+        }
+        // Finally, see if any people share clauses in common.
+        let mut clause_hash: HashMap<String, Vec<u8>> = HashMap::new();
+        for idx in 0..self.number_of_real_players() {
+            let player = &self.player_data[idx as usize];
+            for clause in player.possible_cards.iter() {
+                let clause_str = ClueEngine::card_set_to_sorted_string(clause);
+                if clause_hash.contains_key(&clause_str) {
+                    clause_hash.get_mut(&clause_str).unwrap().push(idx);
+                }
+                else {
+                    clause_hash.insert(clause_str, vec![idx]);
+                }
+            }
+        }
+        for (clause, players) in clause_hash.iter() {
+            // If n people all have an n-length clause, no one else can have
+            // a card in that clause.
+            if (clause.len() <= players.len()) {
+                let affected_people: HashSet<u8> = HashSet::from_iter(players.iter().map(|x| *x));
+                for card in clause.chars().map(|ch| ClueEngine::card_from_char(ch)) {
+                    changed_cards.insert(card);
+                }
+                for idx in 0..(self.number_of_real_players() + 1) {
+                    if !affected_people.contains(&idx) {
+                        for card in clause.chars().map(|ch| ClueEngine::card_from_char(ch)) {
+                            if self.player_data[idx as usize].has_card(card) != Some(false) {
+                                // TODOTODO
+                                let other_changed_cards = self.player_data[idx as usize].info_on_card(card, false);
+                                // TODO - add utility method for this
+                                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return changed_cards;
     }
 }
 
@@ -535,6 +684,7 @@ mod tests {
     fn test_load_from_string_simple() {
         let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
         assert_eq!(3, clue_engine.player_data.len());
+        assert_eq!(2, clue_engine.number_of_real_players());
         assert_eq!(9, clue_engine.player_data[0].num_cards);
         assert_eq!(false, clue_engine.player_data[0].is_solution_player);
         assert_eq!(1, clue_engine.player_data[0].has_cards.len());
