@@ -2,6 +2,9 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::{collections::HashSet, collections::HashMap, iter::Peekable, str::Chars};
 use std::iter::FromIterator;
+use std::rc::Rc;
+use std::rc::Weak;
+use std::cell::RefCell;
 
 type CardSet = HashSet<Card>;
 
@@ -145,7 +148,7 @@ pub struct PlayerData {
     // A list of clauses.  Each clause is a set of cards, one of which
     // the player is known to have.
     possible_cards: Vec<CardSet>,
-    //clue_engine: &'a ClueEngine<'a>, // TODO - do we really need this?
+    clue_engine: Rc<ClueEngine>,
     is_solution_player: bool,
     // None means we don't know how many cards
     num_cards: Option<u8>
@@ -153,12 +156,12 @@ pub struct PlayerData {
 
 impl PlayerData {
     //fn new(clue_engine: &'a ClueEngine<'a>, num_cards: i8, is_solution_player: bool) -> PlayerData<'a> {
-    fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
+    fn new(clue_engine: Rc<ClueEngine>, num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
         return PlayerData {
             has_cards: HashSet::new(),
             not_has_cards: HashSet::new(),
             possible_cards: vec!(),
-            //clue_engine,
+            clue_engine: Rc::clone(&clue_engine),
             is_solution_player,
             num_cards
         };
@@ -245,8 +248,7 @@ impl PlayerData {
             } else {
                 self.possible_cards.push(new_clause);
             }
-            let updated_cards = self.examine_clauses(None);
-            updated_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+            changed_cards.extend(self.examine_clauses(None));
         }
         return changed_cards;
     }
@@ -262,6 +264,7 @@ impl PlayerData {
     }
 
     // TODO - updateClueEngine stuff?
+    // TODO - need to call check_solution(card)
     fn info_on_card(self: &mut PlayerData, card: Card, has_card: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
         if has_card {
@@ -271,7 +274,16 @@ impl PlayerData {
             self.not_has_cards.insert(card);
         }
         changed_cards.insert(card);
-        //TODO more
+        changed_cards.extend(self.examine_clauses(Some(card)));
+        if has_card && self.is_solution_player {
+            // We know we have no other cards in this category.
+            let card_type = CardUtils::card_type(card);
+            for other_card in CardUtils::cards_of_type(card_type) {
+                if other_card != card {
+                    changed_cards.extend(self.info_on_card(other_card, false))
+                }
+            }
+        }
 
         return changed_cards;
     }
@@ -315,22 +327,43 @@ impl PlayerData {
 }
 
 pub struct ClueEngine {
-    player_data: Vec<PlayerData>,
+    // oof, see https://doc.rust-lang.org/std/rc/index.html
+    player_data: RefCell<Vec<Weak<PlayerData>>>,
 }
 
 impl ClueEngine {
-    fn new(number_of_players: u8) -> ClueEngine {
-        let mut player_datas: Vec<PlayerData> = vec!();
+    fn new(number_of_players: u8) -> Rc<ClueEngine> {
+        let clue_engine: Rc<ClueEngine> = Rc::new(
+            ClueEngine {
+                player_data: RefCell::new(vec![])
+            }
+        )
+        let mut player_datas: Vec<Rc<PlayerData>> = vec!();
         for i in 0..(number_of_players + 1) {
-            let player_data = PlayerData::new(Some(ClueEngine::number_of_player_cards(i, number_of_players)), i == number_of_players);
+            let player_data = Rc::new(
+                PlayerData::new(
+                Rc::clone(&clue_engine),
+                Some(ClueEngine::number_of_player_cards(i, number_of_players)),
+                i == number_of_players)
+            );
             player_datas.push(player_data);
         }
-        let clue_engine = ClueEngine { player_data: player_datas };
-        //TODO?
-        /*for i in 0..number_of_players {
-            clue_engine.player_data[i].clue
-        }*/
+        {
+            let mut players = clue_engine.player_data.borrow_mut();
+            for player_data in player_datas {
+                players.push(Rc::downgrade(&player_data));
+            }
+        }
         return clue_engine;
+    }
+
+    fn get_player(players: &Ref<Vec<Weak<PlayerData>>>, index: usize) -> &PlayerData {
+        return players[index].upgrade().unwrap();
+    }
+    
+    // TODOTODO
+    fn get_players(players: &Ref<Vec<Weak<PlayerData>>>) -> &Vec<PlayerData> {
+        return players[index].upgrade().unwrap();
     }
 
     fn number_of_real_players(self: &Self) -> u8 {
@@ -419,14 +452,14 @@ impl ClueEngine {
             if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
                 // Every player except one doesn't have this card, so we know the player has it.
                 let other_changed_cards = self.player_data[player_who_might_have_card.unwrap()].info_on_card(real_card, true);
-                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                changed_cards.extend(other_changed_cards);
             }
             else if someone_has_card {
                 // Someone has this card, so no one else does. (including solution)
                 for player in self.player_data.iter_mut() {
                     if player.has_card(real_card) == None {
                         let other_changed_cards = player.info_on_card(real_card, false);
-                        other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                        changed_cards.extend(other_changed_cards);
                     }
                 }
             }
@@ -471,31 +504,36 @@ impl ClueEngine {
         }
         // Finally, see if any people share clauses in common.
         let mut clause_hash: HashMap<String, Vec<u8>> = HashMap::new();
-        for idx in 0..self.number_of_real_players() {
-            let player = &self.player_data[idx as usize];
-            for clause in player.possible_cards.iter() {
-                let clause_str = CardUtils::card_set_to_sorted_string(clause);
-                if clause_hash.contains_key(&clause_str) {
-                    clause_hash.get_mut(&clause_str).unwrap().push(idx);
-                }
-                else {
-                    clause_hash.insert(clause_str, vec![idx]);
+        {
+            let players = self.player_data.borrow();
+            for idx in 0..self.number_of_real_players() {
+                let player_data = Self::get_player(players, idx as usize);
+                for clause in player.possible_cards.iter() {
+                    let clause_str = CardUtils::card_set_to_sorted_string(clause);
+                    if clause_hash.contains_key(&clause_str) {
+                        clause_hash.get_mut(&clause_str).unwrap().push(idx);
+                    }
+                    else {
+                        clause_hash.insert(clause_str, vec![idx]);
+                    }
                 }
             }
         }
         for (clause, players) in clause_hash.iter() {
             // If n people all have an n-length clause, no one else can have
             // a card in that clause.
-            if (clause.len() <= players.len()) {
+            if clause.len() <= players.len() {
                 let affected_people: HashSet<u8> = HashSet::from_iter(players.iter().map(|x| *x));
                 for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                     changed_cards.insert(card);
                 }
                 for idx in 0..(self.number_of_real_players() + 1) {
                     if !affected_people.contains(&idx) {
+                        let players = self.player_data.borrow();
+                        let player_data = Self::get_player(players, idx as usize);
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
-                            if self.player_data[idx as usize].has_card(card) != Some(false) {
-                                let other_changed_cards = self.player_data[idx as usize].info_on_card(card, false);
+                            if player_data.has_card(card) != Some(false) {
+                                let other_changed_cards = player_data.info_on_card(card, false);
                                 changed_cards.extend(other_changed_cards.iter());
                             }
                         }
@@ -675,28 +713,40 @@ mod tests {
     #[test]
     fn test_load_from_string_simple() {
         let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
-        assert_eq!(3, clue_engine.player_data.len());
         assert_eq!(2, clue_engine.number_of_real_players());
-        assert_eq!(Some(9), clue_engine.player_data[0].num_cards);
-        assert_eq!(false, clue_engine.player_data[0].is_solution_player);
-        assert_eq!(1, clue_engine.player_data[0].has_cards.len());
-        assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
-        assert_eq!(0, clue_engine.player_data[0].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
+        {
+            let players = clue_engine.player_data.borrow();
+            assert_eq!(3, players.len());
+            {
+                let player_0 = ClueEngine::get_player(players, 0);
+                assert_eq!(Some(9), player_0.num_cards);
+                assert_eq!(false, player_0.is_solution_player);
+                assert_eq!(1, player_0.has_cards.len());
+                assert_eq!(Some(true), player_0.has_card(Card::ProfessorPlum));
+                assert_eq!(0, player_0.not_has_cards.len());
+                assert_eq!(0, player_0.possible_cards.len());
+            }
 
-        assert_eq!(Some(9), clue_engine.player_data[1].num_cards);
-        assert_eq!(false, clue_engine.player_data[1].is_solution_player);
-        assert_eq!(0, clue_engine.player_data[1].has_cards.len());
-        //TODO - this should be 1 once we're doing inference correctly
-        assert_eq!(0, clue_engine.player_data[1].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[1].possible_cards.len());
+            {
+                let player_1 = ClueEngine::get_player(players, 1);
+                assert_eq!(Some(9), player_1.num_cards);
+                assert_eq!(false, player_1.is_solution_player);
+                assert_eq!(0, player_1.has_cards.len());
+                //TODO - this should be 1 once we're doing inference correctly
+                assert_eq!(0, player_1.not_has_cards.len());
+                assert_eq!(0, player_1.possible_cards.len());
+            }
 
-        assert_eq!(Some(3), clue_engine.player_data[2].num_cards);
-        assert_eq!(true, clue_engine.player_data[2].is_solution_player);
-        assert_eq!(0, clue_engine.player_data[2].has_cards.len());
-        //TODO - this should be 1 once we're doing inference correctly
-        assert_eq!(0, clue_engine.player_data[2].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
+            {
+                let player_2 = ClueEngine::get_player(players, 2);
+                assert_eq!(Some(3), player_2.num_cards);
+                assert_eq!(true, player_2.is_solution_player);
+                assert_eq!(0, player_2.has_cards.len());
+                //TODO - this should be 1 once we're doing inference correctly
+                assert_eq!(0, player_2.not_has_cards.len());
+                assert_eq!(0, player_2.possible_cards.len());
+            }
+        }
     }
 
 
