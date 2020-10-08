@@ -187,7 +187,7 @@ impl PlayerData {
         self.num_cards = if num_cards == 0 { None } else { Some(num_cards)};
         // Load the list of cards this player has
         while *tokenizer.peek().unwrap() != '-' {
-            self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
+            self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
         }
         // advance past the '-'
         tokenizer.next();
@@ -195,7 +195,7 @@ impl PlayerData {
         {
             let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
+                self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
                 next_char = *tokenizer.peek().unwrap();
             }
         }
@@ -239,7 +239,7 @@ impl PlayerData {
             if new_clause.len() == 1 {
                 // We have learned player has this card!
                 let new_card = *new_clause.iter().next().unwrap();
-                let other_changed_cards = self.info_on_card(new_card, true);
+                let other_changed_cards = self.info_on_card(new_card, true, true);
                 changed_cards.extend(other_changed_cards.iter());
             } else {
                 self.possible_cards.push(new_clause);
@@ -261,7 +261,7 @@ impl PlayerData {
     }
 
     // TODO - updateClueEngine stuff?
-    fn info_on_card(self: &mut PlayerData, card: Card, has_card: bool) -> CardSet {
+    fn info_on_card(self: &mut PlayerData, card: Card, has_card: bool, update_clue_engine: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
         if has_card {
             self.has_cards.insert(card);
@@ -270,6 +270,10 @@ impl PlayerData {
             self.not_has_cards.insert(card);
         }
         changed_cards.insert(card);
+        changed_cards.extend(self.examine_clauses(Some(card)).iter());
+        if (update_clue_engine) {
+            changed_cards.extend(self.clue_engine.borrow_mut().check_solution(Some(card)).iter());
+        }
         //TODO more
 
         return changed_cards;
@@ -431,7 +435,7 @@ impl ClueEngine {
             }
             if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
                 // Every player except one doesn't have this card, so we know the player has it.
-                let other_changed_cards = self.player_data[player_who_might_have_card.unwrap()].borrow_mut().info_on_card(real_card, true);
+                let other_changed_cards = self.player_data[player_who_might_have_card.unwrap()].borrow_mut().info_on_card(real_card, true, false);
                 other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
             }
             else if someone_has_card {
@@ -439,7 +443,7 @@ impl ClueEngine {
                 for player in self.player_data.iter() {
                     let mut player_mut = player.borrow_mut();
                     if player_mut.has_card(real_card) == None {
-                        let other_changed_cards = player_mut.info_on_card(real_card, false);
+                        let other_changed_cards = player_mut.info_on_card(real_card, false, false);
                         other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
                     }
                 }
@@ -510,7 +514,7 @@ impl ClueEngine {
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                             let mut player_data = self.player_data[idx as usize].borrow_mut();
                             if player_data.has_card(card) != Some(false) {
-                                let other_changed_cards = player_data.info_on_card(card, false);
+                                let other_changed_cards = player_data.info_on_card(card, false, false);
                                 changed_cards.extend(other_changed_cards.iter());
                             }
                         }
