@@ -246,7 +246,7 @@ impl PlayerData {
                 self.possible_cards.push(new_clause);
             }
             let updated_cards = self.examine_clauses(None);
-            updated_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+            changed_cards.extend(updated_cards.iter());
         }
         return changed_cards;
     }
@@ -419,14 +419,14 @@ impl ClueEngine {
             if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
                 // Every player except one doesn't have this card, so we know the player has it.
                 let other_changed_cards = self.player_data[player_who_might_have_card.unwrap()].info_on_card(real_card, true);
-                other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                changed_cards.extend(other_changed_cards.iter());
             }
             else if someone_has_card {
                 // Someone has this card, so no one else does. (including solution)
                 for player in self.player_data.iter_mut() {
                     if player.has_card(real_card) == None {
                         let other_changed_cards = player.info_on_card(real_card, false);
-                        other_changed_cards.iter().for_each(|c| {changed_cards.insert(*c);});
+                        changed_cards.extend(other_changed_cards.iter());
                     }
                 }
             }
