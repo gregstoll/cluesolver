@@ -475,6 +475,41 @@ impl ClueEngine {
         return new_clauses;
     }
 
+    // Returns whether there's a set of choices that can satisfy all these clauses,
+    // given we can only use up to num_accounted_for cards.
+    fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: usize) -> bool {
+        if clauses.len() == 0 {
+            return true;
+        }
+        if num_unaccounted_for == 0 {
+            return false;
+        }
+        // See if there's any way we can satisfy these
+        // Try one card at a time
+        // TODO - optimize this? this might be a hotspot
+        //  - should be able to use the smallest clause or something
+        let card_clauses = ClueEngine::transpose_clauses(clauses);
+        for test_card in card_clauses.keys() {
+            // First, remove all clauses containing this card.
+            let new_clauses = ClueEngine::remove_clauses_with_indices(clauses, card_clauses.get(test_card).unwrap());
+            // See if it's possible to satisfy the rest of the clauses with one fewer card.
+            if ClueEngine::can_satisfy(&new_clauses, num_unaccounted_for - 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn remove_clauses_with_indices(clauses: &Vec<CardSet>, indices_to_remove: &HashSet<usize>) -> Vec<CardSet> {
+        let mut new_clauses = vec!();
+        for i in 0..clauses.len() {
+            if !indices_to_remove.contains(&i) {
+                new_clauses.push(clauses[i].clone());
+            }
+        }
+        return new_clauses;
+    }
+
     // TODO - document this
     fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
         // TODO - this method is really long
@@ -867,6 +902,60 @@ mod tests {
         assert_eq!(make_card_set(vec![Card::Conservatory]), removed[2]);
         assert_eq!(make_card_set(vec![Card::Library, Card::Hall]), removed[3]);
         assert_eq!(make_card_set(vec![]), removed[4]);
+    }
+
+    #[test]
+    fn test_can_satisfy_one_card() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library]),
+            make_card_set(vec![Card::ProfessorPlum])];
+        assert_eq!(true, ClueEngine::can_satisfy(&clauses, 1));
+    }
+
+    #[test]
+    fn test_can_satisfy_no_cards() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library]),
+            make_card_set(vec![Card::ProfessorPlum])];
+        assert_eq!(false, ClueEngine::can_satisfy(&clauses, 0));
+    }
+
+    #[test]
+    fn test_can_satisfy_extra_cards() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library]),
+            make_card_set(vec![Card::ProfessorPlum])];
+        assert_eq!(true, ClueEngine::can_satisfy(&clauses, 2));
+    }
+    
+    #[test]
+    fn test_can_satisfy_two_cards() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library]),
+            make_card_set(vec![Card::Hall])];
+        assert_eq!(true, ClueEngine::can_satisfy(&clauses, 2));
+    }
+
+    #[test]
+    fn test_can_satisfy_needs_two_cards_but_only_room_for_one() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library]),
+            make_card_set(vec![Card::Hall])];
+        assert_eq!(false, ClueEngine::can_satisfy(&clauses, 1));
+    }
+
+    #[test]
+    fn test_can_satisfy_needs_one_card_if_careful() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
+            make_card_set(vec![Card::Hall])];
+        assert_eq!(true, ClueEngine::can_satisfy(&clauses, 1));
     }
 
     #[test]
