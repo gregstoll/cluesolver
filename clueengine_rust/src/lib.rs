@@ -464,6 +464,17 @@ impl ClueEngine {
         return transposed_clauses;
     }
 
+    fn remove_card_from_clauses(clauses: &Vec<CardSet>, card: Card) -> Vec<CardSet> {
+        let mut new_clauses = vec!();
+        new_clauses.reserve(clauses.len());
+        for clause in clauses {
+            let mut new_clause = clause.clone();
+            new_clause.remove(&card);
+            new_clauses.push(new_clause);
+        }
+        return new_clauses;
+    }
+
     // TODO - document this
     fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
         // TODO - this method is really long
@@ -829,6 +840,7 @@ mod tests {
             make_card_set(vec![Card::Library, Card::Hall])];
  
         let transposed = ClueEngine::transpose_clauses(&clauses);
+
         assert_eq!(6, transposed.len());
         assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::ProfessorPlum).unwrap());
         assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::MsWhite).unwrap());
@@ -836,6 +848,25 @@ mod tests {
         assert_eq!(&make_usize_set(vec![1, 2]), transposed.get(&Card::Wrench).unwrap());
         assert_eq!(&make_usize_set(vec![1, 2]), transposed.get(&Card::Conservatory).unwrap());
         assert_eq!(&make_usize_set(vec![3]), transposed.get(&Card::Hall).unwrap());
+    }
+
+    #[test]
+    fn test_remove_card_from_clauses() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
+            make_card_set(vec![Card::Conservatory, Card::Wrench]),
+            make_card_set(vec![Card::Library, Card::Hall]),
+            make_card_set(vec![Card::Wrench])];
+ 
+        let removed = ClueEngine::remove_card_from_clauses(&clauses, Card::Wrench);
+
+        assert_eq!(5, removed.len());
+        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]), removed[0]);
+        assert_eq!(make_card_set(vec![Card::Library, Card::Conservatory]), removed[1]);
+        assert_eq!(make_card_set(vec![Card::Conservatory]), removed[2]);
+        assert_eq!(make_card_set(vec![Card::Library, Card::Hall]), removed[3]);
+        assert_eq!(make_card_set(vec![]), removed[4]);
     }
 
     #[test]
