@@ -249,12 +249,12 @@ impl ClueEngine {
     }
 
     fn solution_player(self: &Self) -> &PlayerData {
-        &self.player_data[self.player_data.len()]
+        &self.player_data[self.number_of_real_players() as usize]
     }
 
     fn solution_player_mut(self: &mut Self) -> &mut PlayerData {
-        let len = self.player_data.len();
-        &mut self.player_data[len]
+        let index = self.number_of_real_players() as usize;
+        &mut self.player_data[index]
     }
 
     fn number_of_player_cards(player_index: u8, num_players: u8) -> u8 {
@@ -292,6 +292,15 @@ impl ClueEngine {
         return clue_engine;
     }
 
+    // format is (concatenated)
+    // <number of cards (or 0 if this is unknown)>
+    // one letter per card in has_cards
+    // '-'
+    // one letter per card in not_has_cards
+    // '-'
+    // one letter per card in possible_clauses
+    //  (each possible_clause is separated by '-')
+    // '.'
     fn load_player_from_string(self: &mut ClueEngine, player_index: usize, tokenizer: &mut Tokenizer) {
         {
             let num_cards = tokenizer.next_digit() as u8;
@@ -307,7 +316,7 @@ impl ClueEngine {
         {
             let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                self.info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
+                self.info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), false, true);
                 next_char = *tokenizer.peek().unwrap();
             }
         }
@@ -708,6 +717,20 @@ mod tests {
         assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
     }
 
+    #[test]
+    fn test_load_from_string_then_write_to_string_1() {
+        assert_load_from_string_then_write_to_string_match("29AH-BCD-KL-MN.9-AH.3-AH.");
+    }
+
+    #[test]
+    fn test_load_from_string_then_write_to_string_2() {
+        assert_load_from_string_then_write_to_string_match("29-AU.9A-BU-CDE-FH.3U-AMNOPQRST.");
+    }
+
+    fn assert_load_from_string_then_write_to_string_match(s: &str) {
+        let clue_engine = ClueEngine::load_from_string(s);
+        assert_eq!(s, clue_engine.write_to_string());
+    }
 
     #[test]
     fn test_number_of_cards() {
