@@ -686,6 +686,10 @@ mod tests {
         return HashSet::from_iter(cards.iter().map(|x| *x));
     }
 
+    fn make_usize_set(set: Vec<usize>) -> HashSet<usize> {
+        return HashSet::from_iter(set.iter().map(|x| *x));
+    }
+
     #[test]
     fn test_eliminate_extraneous_clauses_single() {
         let mut clauses: Vec<CardSet> = vec![make_card_set(vec![Card::ProfessorPlum, Card::MsWhite])];
@@ -816,6 +820,7 @@ mod tests {
         assert_eq!(2, clue_engine.player_data[6].has_cards.len());
     }
 
+    #[test]
     fn test_transpose_clauses() {
         let clauses: Vec<CardSet> = vec![
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
@@ -825,7 +830,12 @@ mod tests {
  
         let transposed = ClueEngine::transpose_clauses(&clauses);
         assert_eq!(6, transposed.len());
-        //TODOTODO - finish
+        assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::ProfessorPlum).unwrap());
+        assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::MsWhite).unwrap());
+        assert_eq!(&make_usize_set(vec![1, 3]), transposed.get(&Card::Library).unwrap());
+        assert_eq!(&make_usize_set(vec![1, 2]), transposed.get(&Card::Wrench).unwrap());
+        assert_eq!(&make_usize_set(vec![1, 2]), transposed.get(&Card::Conservatory).unwrap());
+        assert_eq!(&make_usize_set(vec![3]), transposed.get(&Card::Hall).unwrap());
     }
 
     #[test]
