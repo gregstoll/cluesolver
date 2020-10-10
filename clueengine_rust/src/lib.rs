@@ -67,6 +67,10 @@ impl CardUtils {
         return CardType::Room;
     }
 
+    fn all_cards() -> impl Iterator<Item=Card> {
+        return (0..CARD_LAST).map(|x| FromPrimitive::from_i32(x).unwrap());
+    }
+
     fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
         let int_range = match card_type {
             CardType::Suspect => (CardType::Suspect as u8)..(CardType::Weapon as u8),
@@ -189,11 +193,6 @@ impl PlayerData {
         return None;
     }
 
-    fn examine_clauses(self: &mut PlayerData, card: Option<Card>) -> CardSet{
-        //TODO
-        //TODO also this might have to move
-        return HashSet::new();
-    }
 
     fn eliminate_extraneous_clauses(self: &mut PlayerData) {
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut self.possible_cards);
@@ -392,10 +391,77 @@ impl ClueEngine {
             } else {
                 self.player_data[player_index].possible_cards.push(new_clause);
             }
-            let updated_cards = self.player_data[player_index].examine_clauses(None);
+            let updated_cards = self.examine_clauses(player_index, None);
             changed_cards.extend(updated_cards.iter());
         }
         return changed_cards;
+    }
+
+    fn examine_clauses(self: &mut ClueEngine, player_index: usize, card: Option<Card>) -> CardSet{
+        self.player_data[player_index].eliminate_extraneous_clauses();
+        let mut changed_cards = HashSet::new();
+        if let Some(real_card) = card {
+            let player = &mut self.player_data[player_index];
+            // TODO - reexamine this and simplify after it's working
+            let mut possible_cards_copy = player.possible_cards.clone();
+            //for clause in possible_cards_copy {
+            let mut adjustment = 0;
+            for i in 0..possible_cards_copy.len() {
+                let clause = &mut possible_cards_copy[i];
+                if clause.contains(&real_card) {
+                    if player.has_cards.contains(&real_card) {
+                        // We have this card, so this clause is done
+                        player.possible_cards.remove(i - adjustment);
+                        adjustment += 1;
+                    }
+                    else if player.not_has_cards.contains(&real_card) {
+                        (&mut player.possible_cards[i - adjustment]).remove(&real_card);
+                        clause.remove(&real_card);
+                        if clause.len() == 1 {
+                            // We have this card!
+                            let have_card = clause.iter().next().unwrap();
+                            player.has_cards.insert(*have_card);
+                            changed_cards.insert(*have_card);
+                            player.possible_cards.remove(i - adjustment);
+                            adjustment += 1;
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(number_of_cards) = self.player_data[player_index].num_cards {
+            if number_of_cards == self.player_data[player_index].has_cards.len() as u8 {
+                // All cards are accounted for.
+                for other_card in CardUtils::all_cards() {
+                    if self.player_data[player_index].has_card(other_card) == None {
+                        self.learn_info_on_card(player_index, other_card, false, true);
+                    }
+                }
+            }
+            else if self.player_data[player_index].has_cards.len() + self.player_data[player_index].possible_cards.len() > (number_of_cards as usize) {
+                // We may be able to learn something
+                //TODOTODO - finish
+            }
+        }
+        return changed_cards;
+    }
+
+    fn transpose_clauses(possible_cards: &Vec<CardSet>) -> HashMap<Card, HashSet<usize>> {
+        let mut transposed_clauses: HashMap<Card, HashSet<usize>> = HashMap::new();
+        for i in 0..possible_cards.len() {
+            let clause = &possible_cards[i];
+            for card in clause.iter() {
+                if let Some(existing_clauses) = transposed_clauses.get_mut(card) {
+                    existing_clauses.insert(i);
+                }
+                else {
+                    let mut new_hash_set = HashSet::new();
+                    new_hash_set.insert(i);
+                    transposed_clauses.insert(*card, new_hash_set);
+                }
+            }
+        }
+        return transposed_clauses;
     }
 
     // TODO - document this
@@ -521,6 +587,15 @@ impl ClueEngine {
             }
         }
         return changed_cards;
+    }
+
+    fn is_consistent(self: &Self) -> bool {
+        for player in self.player_data.iter() {
+            if player.has_cards.intersection(&player.not_has_cards).any(|&x| true) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -727,6 +802,30 @@ mod tests {
     fn assert_load_from_string_then_write_to_string_match(s: &str) {
         let clue_engine = ClueEngine::load_from_string(s);
         assert_eq!(s, clue_engine.write_to_string());
+    }
+
+    #[test]
+    fn test_add_card_expect_no_extras() {
+        let mut clue_engine = ClueEngine::load_from_string("63FJQ-ABCDEGHIKLMNOPRSTU.3T-CDFHIJKNOPQS.3-CDFHIJKMNOPQST.3NO-CDFHIJKMPQST.3K-CDFHIJNOPQT.3CD-FJNOQT.3-CDFJNOQT.");
+        clue_engine.learn_info_on_card(6, Card::Candlestick, true, true);
+
+        assert_eq!(true, clue_engine.is_consistent());
+        assert_eq!(Some(true), clue_engine.player_data[6].has_card(Card::Candlestick));
+        // This is the third green card, so Kitchen must be the solution
+        assert_eq!(Some(true), clue_engine.player_data[6].has_card(Card::Kitchen));
+        assert_eq!(2, clue_engine.player_data[6].has_cards.len());
+    }
+
+    fn test_transpose_clauses() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
+            make_card_set(vec![Card::Conservatory, Card::Wrench]),
+            make_card_set(vec![Card::Library, Card::Hall])];
+ 
+        let transposed = ClueEngine::transpose_clauses(&clauses);
+        assert_eq!(6, transposed.len());
+        //TODOTODO - finish
     }
 
     #[test]
