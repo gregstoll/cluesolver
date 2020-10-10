@@ -286,7 +286,6 @@ impl ClueEngine {
         let number_of_players = tokenizer.next_digit();
         let mut clue_engine = ClueEngine::new(number_of_players);
         for i in 0..(number_of_players+1) {
-            let player = &mut clue_engine.player_data[i as usize];
             clue_engine.load_player_from_string(i as usize, &mut tokenizer);
         }
         return clue_engine;
@@ -308,7 +307,7 @@ impl ClueEngine {
         }
         // Load the list of cards this player has
         while *tokenizer.peek().unwrap() != '-' {
-            self.info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
+            self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
         }
         // advance past the '-'
         tokenizer.next();
@@ -316,7 +315,7 @@ impl ClueEngine {
         {
             let mut next_char = *tokenizer.peek().unwrap();
             while next_char != '-' && next_char != '.' {
-                self.info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), false, true);
+                self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), false, true);
                 next_char = *tokenizer.peek().unwrap();
             }
         }
@@ -330,12 +329,12 @@ impl ClueEngine {
                 next_char = *tokenizer.peek().unwrap();
             }
             if !clause.is_empty() {
-                self.has_one_of_cards(player_index, clause);
+                self.learn_has_one_of_cards(player_index, clause);
             }
         }
     }
 
-    fn info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
+    fn learn_info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
         {
             let player = &mut self.player_data[player_index];
@@ -354,7 +353,7 @@ impl ClueEngine {
             // We know we have no other cards in this category.
             for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
                 if other_card != card {
-                    changed_cards.extend(self.info_on_card(player_index, other_card, false, true).iter());
+                    changed_cards.extend(self.learn_info_on_card(player_index, other_card, false, true).iter());
                 }
             }
         }
@@ -362,12 +361,10 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    //TODO - need a better naming scheme
-    fn has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: CardSet) -> CardSet {
+    fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: CardSet) -> CardSet {
         let mut clause_helpful = true;
         let mut changed_cards = HashSet::new();
         let mut new_clause = HashSet::new();
-        //TODO finish
         for card in cards.iter() {
             let has_card = self.player_data[player_index].has_card(*card);
             match has_card {
@@ -390,7 +387,7 @@ impl ClueEngine {
             if new_clause.len() == 1 {
                 // We have learned player has this card!
                 let new_card = *new_clause.iter().next().unwrap();
-                let other_changed_cards = self.info_on_card(player_index, new_card, true, true);
+                let other_changed_cards = self.learn_info_on_card(player_index, new_card, true, true);
                 changed_cards.extend(other_changed_cards.iter());
             } else {
                 self.player_data[player_index].possible_cards.push(new_clause);
@@ -437,7 +434,7 @@ impl ClueEngine {
             }
             if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
                 // Every player except one doesn't have this card, so we know the player has it.
-                let other_changed_cards = self.info_on_card(player_who_might_have_card.unwrap(), real_card, true, false);
+                let other_changed_cards = self.learn_info_on_card(player_who_might_have_card.unwrap(), real_card, true, false);
                 changed_cards.extend(other_changed_cards.iter());
             }
             else if someone_has_card {
@@ -445,7 +442,7 @@ impl ClueEngine {
                 for i in 0..self.player_data.len() {
                     let player = &self.player_data[i];
                     if player.has_card(real_card) == None {
-                        let other_changed_cards = self.info_on_card(i, real_card, false, false);
+                        let other_changed_cards = self.learn_info_on_card(i, real_card, false, false);
                         changed_cards.extend(other_changed_cards.iter());
                     }
                 }
@@ -515,7 +512,7 @@ impl ClueEngine {
                     if !affected_people.contains(&idx) {
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
-                                let other_changed_cards = self.info_on_card(idx as usize, card, false, false);
+                                let other_changed_cards = self.learn_info_on_card(idx as usize, card, false, false);
                                 changed_cards.extend(other_changed_cards.iter());
                             }
                         }
