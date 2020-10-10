@@ -145,20 +145,17 @@ pub struct PlayerData {
     // A list of clauses.  Each clause is a set of cards, one of which
     // the player is known to have.
     possible_cards: Vec<CardSet>,
-    //clue_engine: &'a ClueEngine<'a>, // TODO - do we really need this?
     is_solution_player: bool,
     // None means we don't know how many cards
     num_cards: Option<u8>
 }
 
 impl PlayerData {
-    //fn new(clue_engine: &'a ClueEngine<'a>, num_cards: i8, is_solution_player: bool) -> PlayerData<'a> {
     fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
         return PlayerData {
             has_cards: HashSet::new(),
             not_has_cards: HashSet::new(),
             possible_cards: vec!(),
-            //clue_engine,
             is_solution_player,
             num_cards
         };
@@ -326,10 +323,6 @@ impl ClueEngine {
             player_datas.push(player_data);
         }
         let clue_engine = ClueEngine { player_data: player_datas };
-        //TODO?
-        /*for i in 0..number_of_players {
-            clue_engine.player_data[i].clue
-        }*/
         return clue_engine;
     }
 
