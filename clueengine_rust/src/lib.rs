@@ -178,75 +178,6 @@ impl PlayerData {
         return s;
     }
 
-    fn load_from_string(self: &mut PlayerData, tokenizer: &mut Tokenizer) {
-        // TODO - do we need to pass stuff back to the ClueEngine to update things?
-        // seems like this shouldn't need any resolving or anything
-        let num_cards = tokenizer.next_digit() as u8;
-        self.num_cards = if num_cards == 0 { None } else { Some(num_cards)};
-        // Load the list of cards this player has
-        while *tokenizer.peek().unwrap() != '-' {
-            self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
-        }
-        // advance past the '-'
-        tokenizer.next();
-        // Load the list of cards this player doesn't have
-        {
-            let mut next_char = *tokenizer.peek().unwrap();
-            while next_char != '-' && next_char != '.' {
-                self.info_on_card(CardUtils::card_from_char(tokenizer.next().unwrap()), true);
-                next_char = *tokenizer.peek().unwrap();
-            }
-        }
-        // Load the list of clauses as long as it's not done
-        // TODO - assert this is '-' if it's not '.'?
-        while tokenizer.next().unwrap() != '.' {
-            let mut clause = HashSet::new();
-            let mut next_char = *tokenizer.peek().unwrap();
-            while next_char != '-' && next_char != '.' {
-                clause.insert(CardUtils::card_from_char(tokenizer.next().unwrap()));
-                next_char = *tokenizer.peek().unwrap();
-            }
-            if !clause.is_empty() {
-                self.has_one_of_cards(clause);
-            }
-        }
-    }
-
-    //TODO - need a better naming scheme
-    fn has_one_of_cards(self: &mut PlayerData, cards: CardSet) -> CardSet {
-        let mut clause_helpful = true;
-        let mut changed_cards = HashSet::new();
-        let mut new_clause = HashSet::new();
-        //TODO finish
-        for card in cards.iter() {
-            if self.has_cards.contains(card) {
-                // We already know player has one of these cards, so this
-                // clause is worthless.
-                clause_helpful = false;
-            }
-            else if self.not_has_cards.contains(card) {
-                // We know player doesn't have this card, so don't add this card
-                // to the new clause.
-            }
-            else {
-                // Don't know; add it to the new clause
-                new_clause.insert(*card);
-            }
-        }
-        if clause_helpful && !new_clause.is_empty() {
-            if new_clause.len() == 1 {
-                // We have learned player has this card!
-                let new_card = *new_clause.iter().next().unwrap();
-                let other_changed_cards = self.info_on_card(new_card, true);
-                changed_cards.extend(other_changed_cards.iter());
-            } else {
-                self.possible_cards.push(new_clause);
-            }
-            let updated_cards = self.examine_clauses(None);
-            changed_cards.extend(updated_cards.iter());
-        }
-        return changed_cards;
-    }
 
     fn has_card(self: &PlayerData, card: Card) -> Option<bool> {
         if self.has_cards.contains(&card) {
@@ -258,23 +189,9 @@ impl PlayerData {
         return None;
     }
 
-    // TODO - updateClueEngine stuff?
-    fn info_on_card(self: &mut PlayerData, card: Card, has_card: bool) -> CardSet {
-        let mut changed_cards = HashSet::new();
-        if has_card {
-            self.has_cards.insert(card);
-        }
-        else {
-            self.not_has_cards.insert(card);
-        }
-        changed_cards.insert(card);
-        //TODO more
-
-        return changed_cards;
-    }
-
     fn examine_clauses(self: &mut PlayerData, card: Option<Card>) -> CardSet{
         //TODO
+        //TODO also this might have to move
         return HashSet::new();
     }
 
@@ -370,11 +287,111 @@ impl ClueEngine {
         let mut clue_engine = ClueEngine::new(number_of_players);
         for i in 0..(number_of_players+1) {
             let player = &mut clue_engine.player_data[i as usize];
-            player.load_from_string(&mut tokenizer);
+            clue_engine.load_player_from_string(i as usize, &mut tokenizer);
         }
         return clue_engine;
     }
-    
+
+    fn load_player_from_string(self: &mut ClueEngine, player_index: usize, tokenizer: &mut Tokenizer) {
+        {
+            let num_cards = tokenizer.next_digit() as u8;
+            (&mut self.player_data[player_index]).num_cards = if num_cards == 0 { None } else { Some(num_cards)};
+        }
+        // Load the list of cards this player has
+        while *tokenizer.peek().unwrap() != '-' {
+            self.info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
+        }
+        // advance past the '-'
+        tokenizer.next();
+        // Load the list of cards this player doesn't have
+        {
+            let mut next_char = *tokenizer.peek().unwrap();
+            while next_char != '-' && next_char != '.' {
+                self.info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
+                next_char = *tokenizer.peek().unwrap();
+            }
+        }
+        // Load the list of clauses as long as it's not done
+        // TODO - assert this is '-' if it's not '.'?
+        while tokenizer.next().unwrap() != '.' {
+            let mut clause = HashSet::new();
+            let mut next_char = *tokenizer.peek().unwrap();
+            while next_char != '-' && next_char != '.' {
+                clause.insert(CardUtils::card_from_char(tokenizer.next().unwrap()));
+                next_char = *tokenizer.peek().unwrap();
+            }
+            if !clause.is_empty() {
+                self.has_one_of_cards(player_index, clause);
+            }
+        }
+    }
+
+    fn info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
+        let mut changed_cards = HashSet::new();
+        {
+            let player = &mut self.player_data[player_index];
+            if has_card {
+                player.has_cards.insert(card);
+            }
+            else {
+                player.not_has_cards.insert(card);
+            }
+            changed_cards.insert(card);
+        }
+        if update_engine {
+            changed_cards.extend(self.check_solution(Some(card)).iter());
+        }
+        if has_card && self.player_data[player_index].is_solution_player {
+            // We know we have no other cards in this category.
+            for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
+                if other_card != card {
+                    changed_cards.extend(self.info_on_card(player_index, other_card, false, true).iter());
+                }
+            }
+        }
+
+        return changed_cards;
+    }
+
+    //TODO - need a better naming scheme
+    fn has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: CardSet) -> CardSet {
+        let mut clause_helpful = true;
+        let mut changed_cards = HashSet::new();
+        let mut new_clause = HashSet::new();
+        //TODO finish
+        for card in cards.iter() {
+            let has_card = self.player_data[player_index].has_card(*card);
+            match has_card {
+                Some(true) => {
+                    // We already know player has one of these cards, so this
+                    // clause is worthless.
+                    clause_helpful = false;
+                },
+                Some(false) => {
+                    // We know player doesn't have this card, so don't add this card
+                    // to the new clause.
+                },
+                None => {
+                    // Don't know; add it to the new clause
+                    new_clause.insert(*card);
+                }
+            }
+        }
+        if clause_helpful && !new_clause.is_empty() {
+            if new_clause.len() == 1 {
+                // We have learned player has this card!
+                let new_card = *new_clause.iter().next().unwrap();
+                let other_changed_cards = self.info_on_card(player_index, new_card, true, true);
+                changed_cards.extend(other_changed_cards.iter());
+            } else {
+                self.player_data[player_index].possible_cards.push(new_clause);
+            }
+            let updated_cards = self.player_data[player_index].examine_clauses(None);
+            changed_cards.extend(updated_cards.iter());
+        }
+        return changed_cards;
+    }
+
     // TODO - document this
     fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
         // TODO - this method is really long
@@ -411,14 +428,15 @@ impl ClueEngine {
             }
             if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
                 // Every player except one doesn't have this card, so we know the player has it.
-                let other_changed_cards = self.player_data[player_who_might_have_card.unwrap()].info_on_card(real_card, true);
+                let other_changed_cards = self.info_on_card(player_who_might_have_card.unwrap(), real_card, true, false);
                 changed_cards.extend(other_changed_cards.iter());
             }
             else if someone_has_card {
                 // Someone has this card, so no one else does. (including solution)
-                for player in self.player_data.iter_mut() {
+                for i in 0..self.player_data.len() {
+                    let player = &self.player_data[i];
                     if player.has_card(real_card) == None {
-                        let other_changed_cards = player.info_on_card(real_card, false);
+                        let other_changed_cards = self.info_on_card(i, real_card, false, false);
                         changed_cards.extend(other_changed_cards.iter());
                     }
                 }
@@ -488,7 +506,7 @@ impl ClueEngine {
                     if !affected_people.contains(&idx) {
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
-                                let other_changed_cards = self.player_data[idx as usize].info_on_card(card, false);
+                                let other_changed_cards = self.info_on_card(idx as usize, card, false, false);
                                 changed_cards.extend(other_changed_cards.iter());
                             }
                         }
@@ -680,15 +698,13 @@ mod tests {
         assert_eq!(Some(9), clue_engine.player_data[1].num_cards);
         assert_eq!(false, clue_engine.player_data[1].is_solution_player);
         assert_eq!(0, clue_engine.player_data[1].has_cards.len());
-        //TODO - this should be 1 once we're doing inference correctly
-        assert_eq!(0, clue_engine.player_data[1].not_has_cards.len());
+        assert_eq!(1, clue_engine.player_data[1].not_has_cards.len());
         assert_eq!(0, clue_engine.player_data[1].possible_cards.len());
 
         assert_eq!(Some(3), clue_engine.player_data[2].num_cards);
         assert_eq!(true, clue_engine.player_data[2].is_solution_player);
         assert_eq!(0, clue_engine.player_data[2].has_cards.len());
-        //TODO - this should be 1 once we're doing inference correctly
-        assert_eq!(0, clue_engine.player_data[2].not_has_cards.len());
+        assert_eq!(1, clue_engine.player_data[2].not_has_cards.len());
         assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
     }
 
