@@ -959,6 +959,33 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_clauses_with_indices_empty() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
+            make_card_set(vec![Card::Hall])];
+        let new_clauses = ClueEngine::remove_clauses_with_indices(&clauses, &HashSet::new());
+
+        assert_eq!(clauses, new_clauses);
+    }
+
+    #[test]
+    fn test_remove_clauses_with_indices_multiple() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
+            make_card_set(vec![Card::Hall]),
+            make_card_set(vec![Card::Library, Card::MsWhite, Card::Candlestick])];
+        let new_clauses = ClueEngine::remove_clauses_with_indices(&clauses, &make_usize_set(vec![1, 3]));
+
+        let expected: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::Hall])];
+        assert_eq!(expected, new_clauses);
+    }
+
+
+    #[test]
     fn test_number_of_cards() {
         // solution files
         assert_eq!(3, ClueEngine::number_of_player_cards(3, 3));
