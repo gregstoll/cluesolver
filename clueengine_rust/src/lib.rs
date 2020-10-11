@@ -244,7 +244,7 @@ impl ClueEngine {
 
     fn number_of_real_players(self: &Self) -> usize {
         // don't include the solution player
-        return (self.player_data.len() - 1);
+        return self.player_data.len() - 1;
     }
 
     fn solution_player(self: &Self) -> &PlayerData {
@@ -404,7 +404,7 @@ impl ClueEngine {
         if current_player_index == self.number_of_real_players() as usize {
             current_player_index = 0;
         }
-        while true {
+        loop {
             if refuting_player_index == Some(current_player_index) {
                 if let Some(real_card) = card_shown {
                     self.learn_info_on_card(current_player_index, real_card, true, true);
@@ -719,6 +719,37 @@ impl ClueEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_number_of_cards() {
+        // solution files
+        assert_eq!(3, ClueEngine::number_of_player_cards(3, 3));
+        assert_eq!(3, ClueEngine::number_of_player_cards(4, 4));
+        assert_eq!(3, ClueEngine::number_of_player_cards(5, 5));
+        assert_eq!(3, ClueEngine::number_of_player_cards(6, 6));
+
+        assert_eq!(6, ClueEngine::number_of_player_cards(0, 3));
+        assert_eq!(6, ClueEngine::number_of_player_cards(1, 3));
+        assert_eq!(6, ClueEngine::number_of_player_cards(2, 3));
+
+        assert_eq!(5, ClueEngine::number_of_player_cards(0, 4));
+        assert_eq!(5, ClueEngine::number_of_player_cards(1, 4));
+        assert_eq!(4, ClueEngine::number_of_player_cards(2, 4));
+        assert_eq!(4, ClueEngine::number_of_player_cards(3, 4));
+
+        assert_eq!(4, ClueEngine::number_of_player_cards(0, 5));
+        assert_eq!(4, ClueEngine::number_of_player_cards(1, 5));
+        assert_eq!(4, ClueEngine::number_of_player_cards(2, 5));
+        assert_eq!(3, ClueEngine::number_of_player_cards(3, 5));
+        assert_eq!(3, ClueEngine::number_of_player_cards(4, 5));
+
+        assert_eq!(3, ClueEngine::number_of_player_cards(0, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(1, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(2, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(3, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(4, 6));
+        assert_eq!(3, ClueEngine::number_of_player_cards(5, 6));
+    }
 
     #[test]
     fn test_char_from_card() {
@@ -1129,33 +1160,73 @@ mod tests {
     }
 
     #[test]
-    fn test_number_of_cards() {
-        // solution files
-        assert_eq!(3, ClueEngine::number_of_player_cards(3, 3));
-        assert_eq!(3, ClueEngine::number_of_player_cards(4, 4));
-        assert_eq!(3, ClueEngine::number_of_player_cards(5, 5));
-        assert_eq!(3, ClueEngine::number_of_player_cards(6, 6));
+    fn test_all_cards_accounted_for() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_info_on_card(0, Card::ColonelMustard, true, true);
+        clue_engine.learn_info_on_card(1, Card::MrGreen, true, true);
+        clue_engine.learn_info_on_card(2, Card::MissScarlet, true, true);
+        clue_engine.learn_info_on_card(3, Card::MsWhite, true, true);
+        clue_engine.learn_info_on_card(4, Card::MrsPeacock, true, true);
 
-        assert_eq!(6, ClueEngine::number_of_player_cards(0, 3));
-        assert_eq!(6, ClueEngine::number_of_player_cards(1, 3));
-        assert_eq!(6, ClueEngine::number_of_player_cards(2, 3));
-
-        assert_eq!(5, ClueEngine::number_of_player_cards(0, 4));
-        assert_eq!(5, ClueEngine::number_of_player_cards(1, 4));
-        assert_eq!(4, ClueEngine::number_of_player_cards(2, 4));
-        assert_eq!(4, ClueEngine::number_of_player_cards(3, 4));
-
-        assert_eq!(4, ClueEngine::number_of_player_cards(0, 5));
-        assert_eq!(4, ClueEngine::number_of_player_cards(1, 5));
-        assert_eq!(4, ClueEngine::number_of_player_cards(2, 5));
-        assert_eq!(3, ClueEngine::number_of_player_cards(3, 5));
-        assert_eq!(3, ClueEngine::number_of_player_cards(4, 5));
-
-        assert_eq!(3, ClueEngine::number_of_player_cards(0, 6));
-        assert_eq!(3, ClueEngine::number_of_player_cards(1, 6));
-        assert_eq!(3, ClueEngine::number_of_player_cards(2, 6));
-        assert_eq!(3, ClueEngine::number_of_player_cards(3, 6));
-        assert_eq!(3, ClueEngine::number_of_player_cards(4, 6));
-        assert_eq!(3, ClueEngine::number_of_player_cards(5, 6));
+        assert_eq!(Some(true), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ProfessorPlum));
     }
+
+    #[test]
+    fn test_single_card_accounted_for_not_solution() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_info_on_card(clue_engine.number_of_real_players(), Card::ColonelMustard, true, true);
+
+        clue_engine.learn_info_on_card(0, Card::MrGreen, false, true);
+        clue_engine.learn_info_on_card(1, Card::MrGreen, false, true);
+        clue_engine.learn_info_on_card(2, Card::MrGreen, false, true);
+        clue_engine.learn_info_on_card(3, Card::MrGreen, false, true);
+        clue_engine.learn_info_on_card(4, Card::MrGreen, false, true);
+
+        assert_eq!(Some(true), clue_engine.player_data[5].has_card(Card::MrGreen));
+    }
+
+    #[test]
+    fn test_number_card_limit() {
+        let mut clue_engine = ClueEngine::new(6);
+
+        clue_engine.learn_info_on_card(0, Card::MrGreen, true, true);
+        clue_engine.learn_info_on_card(0, Card::Knife, true, true);
+        clue_engine.learn_info_on_card(0, Card::Wrench, true, true);
+
+        assert_eq!(3, clue_engine.player_data[0].has_cards.len());
+        assert_eq!(18, clue_engine.player_data[0].not_has_cards.len());
+        assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
+    }
+
+    #[test]
+    fn test_number_card_deduction() {
+        let mut clue_engine = ClueEngine::new(6);
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Revolver, Card::Lounge, Some(2), None);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Candlestick, Card::BilliardRoom, Some(2), None);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Rope, Card::Kitchen, Some(2), None);
+
+        assert_eq!(make_usize_set(vec![2]), clue_engine.who_has_card(Card::ProfessorPlum));
+        assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::ProfessorPlum));
+    }
+
+    #[test]
+    fn test_number_card_deduction_multiple() {
+        let mut clue_engine = ClueEngine::new(6);
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Lounge, Some(2), None);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::BilliardRoom, Some(2), None);
+
+        assert_eq!(3, clue_engine.player_data[2].possible_cards.len());
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Kitchen, Some(2), None);
+        clue_engine.learn_info_on_card(2, Card::ProfessorPlum, false, true);
+
+        assert_eq!(make_usize_set(vec![2]), clue_engine.who_has_card(Card::Knife));
+        assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::Knife));
+        assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
+    }
+
 }
