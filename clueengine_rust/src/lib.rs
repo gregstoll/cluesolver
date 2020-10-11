@@ -3,10 +3,10 @@ use num_traits::FromPrimitive;
 use std::{collections::HashSet, collections::HashMap, iter::Peekable, str::Chars};
 use std::iter::FromIterator;
 
-type CardSet = HashSet<Card>;
+pub type CardSet = HashSet<Card>;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, FromPrimitive, Hash, Copy, Clone)]
-enum Card {
+pub enum Card {
     // suspects
     ProfessorPlum,
     ColonelMustard,
@@ -35,7 +35,7 @@ enum Card {
 const CARD_LAST : i32 = (Card::BilliardRoom as i32) + 1;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Hash, Copy, Clone)]
-enum CardType {
+pub enum CardType {
     Suspect = 0,
     Weapon = 6,
     Room  = 12
@@ -56,7 +56,7 @@ impl CardUtils {
         return index as char;
     }
 
-    fn card_type(card: Card) -> CardType {
+    pub fn card_type(card: Card) -> CardType {
         let index = card as u8;
         if index < CardType::Weapon as u8 {
             return CardType::Suspect;
@@ -67,11 +67,11 @@ impl CardUtils {
         return CardType::Room;
     }
 
-    fn all_cards() -> impl Iterator<Item=Card> {
+    pub fn all_cards() -> impl Iterator<Item=Card> {
         return (0..CARD_LAST).map(|x| FromPrimitive::from_i32(x).unwrap());
     }
 
-    fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
+    pub fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
         let int_range = match card_type {
             CardType::Suspect => (CardType::Suspect as u8)..(CardType::Weapon as u8),
             CardType::Weapon => (CardType::Weapon as u8)..(CardType::Room as u8),
@@ -85,14 +85,12 @@ impl CardUtils {
         chars.sort();
         return chars.into_iter().collect();
     }
-
-
 }
 
 // https://wduquette.github.io/parsing-strings-into-slices/
 /// The Tokenizer type.  
 #[derive(Clone,Debug)]
-pub struct Tokenizer<'a> {
+struct Tokenizer<'a> {
     // The string being parsed.
     input: &'a str,
 
@@ -112,11 +110,6 @@ impl<'a> Tokenizer<'a> {
             index: 0,
             chars: input.chars().peekable(),
         }
-    }
-
-    // Returns the remainder of the input starting at the index.
-    pub fn as_str(&self) -> &str {
-        &self.input[self.index..]
     }
 
     /// Returns the next character and updates the index.
@@ -143,19 +136,19 @@ impl<'a> Tokenizer<'a> {
 
 pub struct PlayerData {
     // A set of cards that the player is known to have
-    has_cards: CardSet,
+    pub has_cards: CardSet,
     // A set of cards that the player is known not to have
-    not_has_cards: CardSet,
+    pub not_has_cards: CardSet,
     // A list of clauses.  Each clause is a set of cards, one of which
     // the player is known to have.
-    possible_cards: Vec<CardSet>,
-    is_solution_player: bool,
+    pub possible_cards: Vec<CardSet>,
+    pub is_solution_player: bool,
     // None means we don't know how many cards
-    num_cards: Option<u8>
+    pub num_cards: Option<u8>
 }
 
 impl PlayerData {
-    fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
+    pub(crate) fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
         return PlayerData {
             has_cards: HashSet::new(),
             not_has_cards: HashSet::new(),
@@ -165,7 +158,7 @@ impl PlayerData {
         };
     }
 
-    fn write_to_string(self: &PlayerData) -> String {
+    pub(crate) fn write_to_string(self: &PlayerData) -> String {
         let mut s = String::from("");
 
         let num_cards_to_write = self.num_cards.unwrap_or(0);
@@ -183,7 +176,7 @@ impl PlayerData {
     }
 
 
-    fn has_card(self: &PlayerData, card: Card) -> Option<bool> {
+    pub fn has_card(self: &PlayerData, card: Card) -> Option<bool> {
         if self.has_cards.contains(&card) {
             return Some(true);
         }
@@ -194,10 +187,10 @@ impl PlayerData {
     }
 
 
-    fn eliminate_extraneous_clauses(self: &mut PlayerData) {
+    pub(crate) fn eliminate_extraneous_clauses(self: &mut PlayerData) {
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut self.possible_cards);
     }
-    fn eliminate_extraneous_clauses_possible_cards(possible_cards: &mut Vec<CardSet>) {
+    pub(crate) fn eliminate_extraneous_clauses_possible_cards(possible_cards: &mut Vec<CardSet>) {
         let mut need_to_call_again = false;
         // This is O(n^2), but hopefully there aren't too many of these
         'outer: for i in 0..possible_cards.len() {
@@ -228,11 +221,11 @@ impl PlayerData {
 }
 
 pub struct ClueEngine {
-    player_data: Vec<PlayerData>,
+    pub player_data: Vec<PlayerData>,
 }
 
 impl ClueEngine {
-    fn new(number_of_players: u8) -> ClueEngine {
+    pub fn new(number_of_players: u8) -> ClueEngine {
         let mut player_datas: Vec<PlayerData> = vec!();
         for i in 0..(number_of_players + 1) {
             let player_data = PlayerData::new(Some(ClueEngine::number_of_player_cards(i, number_of_players)), i == number_of_players);
@@ -242,21 +235,21 @@ impl ClueEngine {
         return clue_engine;
     }
 
-    fn number_of_real_players(self: &Self) -> usize {
+    pub fn number_of_real_players(self: &Self) -> usize {
         // don't include the solution player
         return self.player_data.len() - 1;
     }
 
-    fn solution_player(self: &Self) -> &PlayerData {
+    pub fn solution_player(self: &Self) -> &PlayerData {
         &self.player_data[self.number_of_real_players()]
     }
 
-    fn solution_player_mut(self: &mut Self) -> &mut PlayerData {
+    pub fn solution_player_mut(self: &mut Self) -> &mut PlayerData {
         let index = self.number_of_real_players();
         &mut self.player_data[index]
     }
 
-    fn number_of_player_cards(player_index: u8, num_players: u8) -> u8 {
+    pub(crate) fn number_of_player_cards(player_index: u8, num_players: u8) -> u8 {
         if player_index == num_players {
             // The case file always has exactly 3 cards
             return 3
@@ -271,7 +264,7 @@ impl ClueEngine {
         return num_cards as u8;
     }
 
-    fn write_to_string(self: &ClueEngine) -> String {
+    pub fn write_to_string(self: &ClueEngine) -> String {
         let mut s = String::from("");
         s += &(self.number_of_real_players()).to_string();
         for player in self.player_data.iter() {
@@ -280,7 +273,7 @@ impl ClueEngine {
         return s;
     }
 
-    fn load_from_string(s: &str) -> ClueEngine {
+    pub fn load_from_string(s: &str) -> ClueEngine {
         let mut tokenizer = Tokenizer::new(s);
         let number_of_players = tokenizer.next_digit();
         let mut clue_engine = ClueEngine::new(number_of_players);
@@ -333,7 +326,7 @@ impl ClueEngine {
         }
     }
 
-    fn learn_info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
+    pub fn learn_info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
         {
             let player = &mut self.player_data[player_index];
@@ -362,7 +355,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: &CardSet) -> CardSet {
+    pub fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: &CardSet) -> CardSet {
         let mut clause_helpful = true;
         let mut changed_cards = HashSet::new();
         let mut new_clause = HashSet::new();
@@ -399,7 +392,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    fn learn_suggest(self: &mut ClueEngine, suggesting_player_index: usize, card1: Card, card2: Card, card3: Card, refuting_player_index: Option<usize>, card_shown: Option<Card>) {
+    pub fn learn_suggest(self: &mut ClueEngine, suggesting_player_index: usize, card1: Card, card2: Card, card3: Card, refuting_player_index: Option<usize>, card_shown: Option<Card>) {
         let mut current_player_index = suggesting_player_index + 1;
         if current_player_index == self.number_of_real_players() as usize {
             current_player_index = 0;
@@ -501,7 +494,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    fn transpose_clauses(possible_cards: &Vec<CardSet>) -> HashMap<Card, HashSet<usize>> {
+    pub(crate) fn transpose_clauses(possible_cards: &Vec<CardSet>) -> HashMap<Card, HashSet<usize>> {
         let mut transposed_clauses: HashMap<Card, HashSet<usize>> = HashMap::new();
         for i in 0..possible_cards.len() {
             let clause = &possible_cards[i];
@@ -519,7 +512,7 @@ impl ClueEngine {
         return transposed_clauses;
     }
 
-    fn remove_card_from_clauses(clauses: &Vec<CardSet>, card: Card) -> Vec<CardSet> {
+    pub(crate) fn remove_card_from_clauses(clauses: &Vec<CardSet>, card: Card) -> Vec<CardSet> {
         let mut new_clauses = vec!();
         new_clauses.reserve(clauses.len());
         for clause in clauses {
@@ -532,7 +525,7 @@ impl ClueEngine {
 
     // Returns whether there's a set of choices that can satisfy all these clauses,
     // given we can only use up to num_accounted_for cards.
-    fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: usize) -> bool {
+    pub(crate) fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: usize) -> bool {
         if clauses.len() == 0 {
             return true;
         }
@@ -555,7 +548,7 @@ impl ClueEngine {
         return false;
     }
 
-    fn remove_clauses_with_indices(clauses: &Vec<CardSet>, indices_to_remove: &HashSet<usize>) -> Vec<CardSet> {
+    pub(crate) fn remove_clauses_with_indices(clauses: &Vec<CardSet>, indices_to_remove: &HashSet<usize>) -> Vec<CardSet> {
         let mut new_clauses = vec!();
         for i in 0..clauses.len() {
             if !indices_to_remove.contains(&i) {
@@ -690,7 +683,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    fn is_consistent(self: &Self) -> bool {
+    pub fn is_consistent(self: &Self) -> bool {
         for player in self.player_data.iter() {
             if player.has_cards.intersection(&player.not_has_cards).any(|_x| true) {
                 return false;
@@ -699,7 +692,7 @@ impl ClueEngine {
         return true;
     }
 
-    fn who_has_card(self: &Self, card: Card) -> HashSet<usize> {
+    pub fn who_has_card(self: &Self, card: Card) -> HashSet<usize> {
         let mut possible_owners = HashSet::new();
         for i in 0..(self.number_of_real_players() + 1) {
             match self.player_data[i].has_card(card) {
@@ -716,9 +709,18 @@ impl ClueEngine {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_card_set(cards: Vec<Card>) -> CardSet {
+        return HashSet::from_iter(cards.iter().map(|x| *x));
+    }
+
+    fn make_usize_set(set: Vec<usize>) -> HashSet<usize> {
+        return HashSet::from_iter(set.iter().map(|x| *x));
+    }
 
     #[test]
     fn test_number_of_cards() {
@@ -768,12 +770,12 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_card_from_char_on_char_below_a__panics() {
+    fn test_card_from_char_on_char_below_a_panics() {
         let _ch = CardUtils::card_from_char('0');
     }
     #[test]
     #[should_panic]
-    fn test_card_from_char_on_char_above_u__panics() {
+    fn test_card_from_char_on_char_above_u_panics() {
         let _ch = CardUtils::card_from_char('V');
     }
 
@@ -787,17 +789,6 @@ mod tests {
         assert_eq!(Card::Hall, CardUtils::card_from_char('M'));
         assert_eq!(Card::BilliardRoom, CardUtils::card_from_char('U'));
     }
- 
-    #[test]
-    fn test_card_type() {
-        assert_eq!(CardType::Suspect, CardUtils::card_type(Card::ProfessorPlum));
-        assert_eq!(CardType::Suspect, CardUtils::card_type(Card::ColonelMustard));
-        assert_eq!(CardType::Suspect, CardUtils::card_type(Card::MrsPeacock));
-        assert_eq!(CardType::Weapon, CardUtils::card_type(Card::Knife));
-        assert_eq!(CardType::Weapon, CardUtils::card_type(Card::Wrench));
-        assert_eq!(CardType::Room, CardUtils::card_type(Card::Hall));
-        assert_eq!(CardType::Room, CardUtils::card_type(Card::BilliardRoom));
-    }
 
     #[test]
     fn test_card_set_to_sorted_string() {
@@ -807,35 +798,10 @@ mod tests {
     }
 
     #[test]
-    fn test_cards_of_type_suspect() {
-        let expected = vec![Card::ProfessorPlum, Card::ColonelMustard, Card::MrGreen, Card::MissScarlet, Card::MsWhite, Card::MrsPeacock];
-        assert_eq!(expected, CardUtils::cards_of_type(CardType::Suspect).collect::<Vec<Card>>());
-    }
-
-    #[test]
-    fn test_cards_of_type_weapon() {
-        let expected = vec![Card::Knife, Card::Candlestick, Card::Revolver, Card::LeadPipe, Card::Rope, Card::Wrench];
-        assert_eq!(expected, CardUtils::cards_of_type(CardType::Weapon).collect::<Vec<Card>>());
-    }
-
-    #[test]
-    fn test_cards_of_type_room() {
-        let expected = vec![Card::Hall, Card::Conservatory, Card::DiningRoom, Card::Kitchen, Card::Study, Card::Library, Card::Ballroom, Card::Lounge, Card::BilliardRoom];
-        assert_eq!(expected, CardUtils::cards_of_type(CardType::Room).collect::<Vec<Card>>());
-    }
-    #[test]
     fn test_eliminate_extraneous_clauses_empty() {
         let mut clauses: Vec<CardSet> = vec![];
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert!(clauses.is_empty());
-    }
-
-    fn make_card_set(cards: Vec<Card>) -> CardSet {
-        return HashSet::from_iter(cards.iter().map(|x| *x));
-    }
-
-    fn make_usize_set(set: Vec<usize>) -> HashSet<usize> {
-        return HashSet::from_iter(set.iter().map(|x| *x));
     }
 
     #[test]
@@ -915,79 +881,6 @@ mod tests {
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
     }
-
-    #[test]
-    fn test_load_from_string_simple() {
-        let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
-        assert_eq!(3, clue_engine.player_data.len());
-        assert_eq!(2, clue_engine.number_of_real_players());
-        assert_eq!(Some(9), clue_engine.player_data[0].num_cards);
-        assert_eq!(false, clue_engine.player_data[0].is_solution_player);
-        assert_eq!(1, clue_engine.player_data[0].has_cards.len());
-        assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
-        assert_eq!(0, clue_engine.player_data[0].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
-
-        assert_eq!(Some(9), clue_engine.player_data[1].num_cards);
-        assert_eq!(false, clue_engine.player_data[1].is_solution_player);
-        assert_eq!(0, clue_engine.player_data[1].has_cards.len());
-        assert_eq!(1, clue_engine.player_data[1].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[1].possible_cards.len());
-
-        assert_eq!(Some(3), clue_engine.player_data[2].num_cards);
-        assert_eq!(true, clue_engine.player_data[2].is_solution_player);
-        assert_eq!(0, clue_engine.player_data[2].has_cards.len());
-        assert_eq!(1, clue_engine.player_data[2].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
-    }
-
-    #[test]
-    fn test_load_from_string_has_and_not_has() {
-        let clue_engine = ClueEngine::load_from_string("29A-B.9L-C.3U-.");
-        assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
-        assert_eq!(Some(false), clue_engine.player_data[0].has_card(Card::ColonelMustard));
-        assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::Wrench));
-        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::MrGreen));
-        assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::BilliardRoom));
-    }
-
-    #[test]
-    fn test_load_from_string_some_clauses() {
-        let clue_engine = ClueEngine::load_from_string("29-.9A-B-CDE-FGH.3U-.");
-        assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
-        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ColonelMustard));
-        assert_eq!(2, clue_engine.player_data[1].possible_cards.len());
-        assert_eq!(HashSet::from_iter(vec!['C', 'D', 'E'].iter().map(|ch| CardUtils::card_from_char(*ch))), clue_engine.player_data[1].possible_cards[0]);
-        assert_eq!(HashSet::from_iter(vec!['F', 'G', 'H'].iter().map(|ch| CardUtils::card_from_char(*ch))), clue_engine.player_data[1].possible_cards[1]);
-    }
-
-    #[test]
-    fn test_load_from_string_then_write_to_string_1() {
-        assert_load_from_string_then_write_to_string_match("29AH-BCD-KL-MN.9-AH.3-AH.");
-    }
-
-    #[test]
-    fn test_load_from_string_then_write_to_string_2() {
-        assert_load_from_string_then_write_to_string_match("29-AU.9A-BU-CDE-FH.3U-AMNOPQRST.");
-    }
-
-    fn assert_load_from_string_then_write_to_string_match(s: &str) {
-        let clue_engine = ClueEngine::load_from_string(s);
-        assert_eq!(s, clue_engine.write_to_string());
-    }
-
-    #[test]
-    fn test_add_card_expect_no_extras() {
-        let mut clue_engine = ClueEngine::load_from_string("63FJQ-ABCDEGHIKLMNOPRSTU.3T-CDFHIJKNOPQS.3-CDFHIJKMNOPQST.3NO-CDFHIJKMPQST.3K-CDFHIJNOPQT.3CD-FJNOQT.3-CDFJNOQT.");
-        clue_engine.learn_info_on_card(6, Card::Candlestick, true, true);
-
-        assert_eq!(true, clue_engine.is_consistent());
-        assert_eq!(Some(true), clue_engine.player_data[6].has_card(Card::Candlestick));
-        // This is the third green card, so Kitchen must be the solution
-        assert_eq!(Some(true), clue_engine.player_data[6].has_card(Card::Kitchen));
-        assert_eq!(2, clue_engine.player_data[6].has_cards.len());
-    }
-
     #[test]
     fn test_transpose_clauses() {
         let clauses: Vec<CardSet> = vec![
@@ -1104,193 +997,6 @@ mod tests {
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(expected, new_clauses);
-    }
-
-    #[test]
-    fn test_simple_suggest() {
-        let mut clue_engine = ClueEngine::new(5);
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), Some(Card::Knife));
-
-        assert_eq!(Some(true), clue_engine.player_data[3].has_card(Card::Knife));
-        assert_eq!(Some(false), clue_engine.player_data[4].has_card(Card::Knife));
-        assert_eq!(None, clue_engine.player_data[3].has_card(Card::ProfessorPlum));
-        assert_eq!(None, clue_engine.player_data[3].has_card(Card::Hall));
-        assert_eq!(Some(false), clue_engine.player_data[2].has_card(Card::ProfessorPlum));
-        assert_eq!(Some(false), clue_engine.player_data[2].has_card(Card::Hall));
-        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
-        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::Hall));
-        assert_eq!(None, clue_engine.player_data[0].has_card(Card::ProfessorPlum));
-        assert_eq!(None, clue_engine.player_data[0].has_card(Card::Hall));
-        assert_eq!(None, clue_engine.player_data[4].has_card(Card::ProfessorPlum));
-        assert_eq!(None, clue_engine.player_data[4].has_card(Card::Hall));
-        assert_eq!(None, clue_engine.player_data[5].has_card(Card::ProfessorPlum));
-        assert_eq!(None, clue_engine.player_data[5].has_card(Card::Hall));
-    }
-
-    #[test]
-    fn test_suggest_no_refute() {
-        let mut clue_engine = ClueEngine::new(3);
-
-        clue_engine.learn_suggest(1, Card::ProfessorPlum, Card::Knife, Card::Hall, None, None);
-        clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
-
-        assert_eq!(Some(true), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ProfessorPlum));
-        assert_eq!(Some(false), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ColonelMustard));
-        assert_eq!(None, clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::Knife));
-        assert_eq!(None, clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::Hall));
-        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
-        assert_eq!(None, clue_engine.player_data[1].has_card(Card::Knife));
-        assert_eq!(Some(false), clue_engine.player_data[0].has_card(Card::Knife));
-        assert_eq!(Some(false), clue_engine.player_data[2].has_card(Card::Knife));
-    }
-
-    #[test]
-    fn test_possible_cards_1() {
-        let mut clue_engine = ClueEngine::new(6);
-        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
-        assert_eq!(make_usize_set(vec![0,3,4,5,6]), clue_engine.who_has_card(Card::ProfessorPlum));
-        assert_eq!(1, clue_engine.player_data[3].possible_cards.len());
-        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife, Card::Hall]), clue_engine.player_data[3].possible_cards[0]);
-
-        clue_engine.learn_info_on_card(3, Card::Hall, true, true);
-        assert_eq!(make_usize_set(vec![3]), clue_engine.who_has_card(Card::Hall));
-        assert_eq!(Some(true), clue_engine.player_data[3].has_card(Card::Hall));
-        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
-    }
-
-    #[test]
-    fn test_possible_cards_2() {
-        let mut clue_engine = ClueEngine::new(6);
-        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
-        clue_engine.learn_info_on_card(3, Card::Hall, false, true);
-        assert_eq!(Some(false), clue_engine.player_data[3].has_card(Card::Hall));
-        assert_eq!(1, clue_engine.player_data[3].possible_cards.len());
-        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife]), clue_engine.player_data[3].possible_cards[0]);
-        
-        clue_engine.learn_info_on_card(3, Card::ProfessorPlum, false, true);
-        assert_eq!(Some(false), clue_engine.player_data[3].has_card(Card::ProfessorPlum));
-        assert_eq!(make_usize_set(vec![3]), clue_engine.who_has_card(Card::Knife));
-        assert_eq!(Some(true), clue_engine.player_data[3].has_card(Card::Knife));
-        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
-    }
-
-    #[test]
-    fn test_all_cards_accounted_for() {
-        let mut clue_engine = ClueEngine::new(6);
-        clue_engine.learn_info_on_card(0, Card::ColonelMustard, true, true);
-        clue_engine.learn_info_on_card(1, Card::MrGreen, true, true);
-        clue_engine.learn_info_on_card(2, Card::MissScarlet, true, true);
-        clue_engine.learn_info_on_card(3, Card::MsWhite, true, true);
-        clue_engine.learn_info_on_card(4, Card::MrsPeacock, true, true);
-
-        assert_eq!(Some(true), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ProfessorPlum));
-    }
-
-    #[test]
-    fn test_single_card_accounted_for_not_solution() {
-        let mut clue_engine = ClueEngine::new(6);
-        clue_engine.learn_info_on_card(clue_engine.number_of_real_players(), Card::ColonelMustard, true, true);
-
-        clue_engine.learn_info_on_card(0, Card::MrGreen, false, true);
-        clue_engine.learn_info_on_card(1, Card::MrGreen, false, true);
-        clue_engine.learn_info_on_card(2, Card::MrGreen, false, true);
-        clue_engine.learn_info_on_card(3, Card::MrGreen, false, true);
-        clue_engine.learn_info_on_card(4, Card::MrGreen, false, true);
-
-        assert_eq!(Some(true), clue_engine.player_data[5].has_card(Card::MrGreen));
-    }
-
-    #[test]
-    fn test_number_card_limit() {
-        let mut clue_engine = ClueEngine::new(6);
-
-        clue_engine.learn_info_on_card(0, Card::MrGreen, true, true);
-        clue_engine.learn_info_on_card(0, Card::Knife, true, true);
-        clue_engine.learn_info_on_card(0, Card::Wrench, true, true);
-
-        assert_eq!(3, clue_engine.player_data[0].has_cards.len());
-        assert_eq!(18, clue_engine.player_data[0].not_has_cards.len());
-        assert_eq!(0, clue_engine.player_data[0].possible_cards.len());
-    }
-
-    #[test]
-    fn test_number_card_deduction() {
-        let mut clue_engine = ClueEngine::new(6);
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Revolver, Card::Lounge, Some(2), None);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Candlestick, Card::BilliardRoom, Some(2), None);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Rope, Card::Kitchen, Some(2), None);
-
-        assert_eq!(make_usize_set(vec![2]), clue_engine.who_has_card(Card::ProfessorPlum));
-        assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::ProfessorPlum));
-    }
-
-    #[test]
-    fn test_number_card_deduction_multiple() {
-        let mut clue_engine = ClueEngine::new(6);
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Lounge, Some(2), None);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::BilliardRoom, Some(2), None);
-
-        assert_eq!(3, clue_engine.player_data[2].possible_cards.len());
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Kitchen, Some(2), None);
-        clue_engine.learn_info_on_card(2, Card::ProfessorPlum, false, true);
-
-        assert_eq!(make_usize_set(vec![2]), clue_engine.who_has_card(Card::Knife));
-        assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::Knife));
-        assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
-    }
-
-    #[test]
-    fn test_eliminate_extra_clauses() {
-        let mut clue_engine = ClueEngine::new(6);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
-        clue_engine.learn_info_on_card(2, Card::Hall, false, true);
-        assert_eq!(1, clue_engine.player_data[2].possible_cards.len());
-        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife]), clue_engine.player_data[2].possible_cards[0]);
-
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Lounge, Some(2), None);
-
-        assert_eq!(1, clue_engine.player_data[2].possible_cards.len());
-        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife]), clue_engine.player_data[2].possible_cards[0]);
-    }
-
-    #[test]
-    fn test_shared_clause_1() {
-        let mut clue_engine = ClueEngine::new(6);
-        clue_engine.learn_info_on_card(1, Card::Hall, false, true);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(1), None);
-        clue_engine.learn_suggest(2, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
-
-        clue_engine.learn_info_on_card(3, Card::Hall, false, true);
-
-        // No one else should have ProfessorPlum or Knife
-        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::ProfessorPlum));
-        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::Knife));
-        assert_eq!(make_usize_set(vec![0, 2, 4, 5, 6]), clue_engine.who_has_card(Card::Hall));
-    }
-
-    #[test]
-    fn test_shared_clause_2() {
-        let mut clue_engine = ClueEngine::new(6);
-        clue_engine.learn_info_on_card(1, Card::Hall, false, true);
-        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(1), None);
-        clue_engine.learn_info_on_card(3, Card::Hall, false, true);
-
-        clue_engine.learn_suggest(2, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
-
-        // No one else should have ProfessorPlum or Knife
-        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::ProfessorPlum));
-        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::Knife));
-        assert_eq!(make_usize_set(vec![0, 2, 4, 5, 6]), clue_engine.who_has_card(Card::Hall));
     }
 
 }
