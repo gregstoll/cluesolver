@@ -242,17 +242,17 @@ impl ClueEngine {
         return clue_engine;
     }
 
-    fn number_of_real_players(self: &Self) -> u8 {
+    fn number_of_real_players(self: &Self) -> usize {
         // don't include the solution player
-        return (self.player_data.len() - 1) as u8;
+        return (self.player_data.len() - 1);
     }
 
     fn solution_player(self: &Self) -> &PlayerData {
-        &self.player_data[self.number_of_real_players() as usize]
+        &self.player_data[self.number_of_real_players()]
     }
 
     fn solution_player_mut(self: &mut Self) -> &mut PlayerData {
-        let index = self.number_of_real_players() as usize;
+        let index = self.number_of_real_players();
         &mut self.player_data[index]
     }
 
@@ -328,7 +328,7 @@ impl ClueEngine {
                 next_char = *tokenizer.peek().unwrap();
             }
             if !clause.is_empty() {
-                self.learn_has_one_of_cards(player_index, clause);
+                self.learn_has_one_of_cards(player_index, &clause);
             }
         }
     }
@@ -362,7 +362,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: CardSet) -> CardSet {
+    fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: &CardSet) -> CardSet {
         let mut clause_helpful = true;
         let mut changed_cards = HashSet::new();
         let mut new_clause = HashSet::new();
@@ -397,6 +397,37 @@ impl ClueEngine {
             changed_cards.extend(updated_cards.iter());
         }
         return changed_cards;
+    }
+
+    fn learn_suggest(self: &mut ClueEngine, suggesting_player_index: usize, card1: Card, card2: Card, card3: Card, refuting_player_index: Option<usize>, card_shown: Option<Card>) {
+        let mut current_player_index = suggesting_player_index + 1;
+        if current_player_index == self.number_of_real_players() as usize {
+            current_player_index = 0;
+        }
+        while true {
+            if refuting_player_index == Some(current_player_index) {
+                if let Some(real_card) = card_shown {
+                    self.learn_info_on_card(current_player_index, real_card, true, true);
+                } else {
+                    let possible_cards = HashSet::from_iter(vec![card1, card2, card3].iter().map(|x| *x));
+                    self.learn_has_one_of_cards(current_player_index, &possible_cards);
+                }
+                self.check_solution(None);
+                return;
+            } else if current_player_index == suggesting_player_index {
+                // No one can refute this.  We're done.
+                self.check_solution(None);
+                return;
+            } else {
+                self.learn_info_on_card(current_player_index, card1, false, false);
+                self.learn_info_on_card(current_player_index, card2, false, false);
+                self.learn_info_on_card(current_player_index, card3, false, false);
+                current_player_index += 1;
+                if current_player_index == self.number_of_real_players() as usize {
+                    current_player_index = 0;
+                }
+            }
+        }
     }
 
     fn examine_clauses(self: &mut ClueEngine, player_index: usize, card: Option<Card>) -> CardSet{
@@ -623,7 +654,7 @@ impl ClueEngine {
             }
         }
         // Finally, see if any people share clauses in common.
-        let mut clause_hash: HashMap<String, Vec<u8>> = HashMap::new();
+        let mut clause_hash: HashMap<String, Vec<usize>> = HashMap::new();
         for idx in 0..self.number_of_real_players() {
             let player = &self.player_data[idx as usize];
             for clause in player.possible_cards.iter() {
@@ -640,7 +671,7 @@ impl ClueEngine {
             // If n people all have an n-length clause, no one else can have
             // a card in that clause.
             if clause.len() <= players.len() {
-                let affected_people: HashSet<u8> = HashSet::from_iter(players.iter().map(|x| *x));
+                let affected_people: HashSet<usize> = HashSet::from_iter(players.iter().map(|x| *x));
                 for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
                     changed_cards.insert(card);
                 }
@@ -666,6 +697,22 @@ impl ClueEngine {
             }
         }
         return true;
+    }
+
+    fn who_has_card(self: &Self, card: Card) -> HashSet<usize> {
+        let mut possible_owners = HashSet::new();
+        for i in 0..(self.number_of_real_players() + 1) {
+            match self.player_data[i].has_card(card) {
+                Some(true) => {
+                    possible_owners.clear();
+                    possible_owners.insert(i);
+                    return possible_owners;
+                },
+                None => possible_owners.insert(i),
+                _ => false
+            };
+        }
+        return possible_owners;
     }
 }
 
@@ -1008,6 +1055,78 @@ mod tests {
         assert_eq!(expected, new_clauses);
     }
 
+    #[test]
+    fn test_simple_suggest() {
+        let mut clue_engine = ClueEngine::new(5);
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), Some(Card::Knife));
+
+        assert_eq!(Some(true), clue_engine.player_data[3].has_card(Card::Knife));
+        assert_eq!(Some(false), clue_engine.player_data[4].has_card(Card::Knife));
+        assert_eq!(None, clue_engine.player_data[3].has_card(Card::ProfessorPlum));
+        assert_eq!(None, clue_engine.player_data[3].has_card(Card::Hall));
+        assert_eq!(Some(false), clue_engine.player_data[2].has_card(Card::ProfessorPlum));
+        assert_eq!(Some(false), clue_engine.player_data[2].has_card(Card::Hall));
+        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
+        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::Hall));
+        assert_eq!(None, clue_engine.player_data[0].has_card(Card::ProfessorPlum));
+        assert_eq!(None, clue_engine.player_data[0].has_card(Card::Hall));
+        assert_eq!(None, clue_engine.player_data[4].has_card(Card::ProfessorPlum));
+        assert_eq!(None, clue_engine.player_data[4].has_card(Card::Hall));
+        assert_eq!(None, clue_engine.player_data[5].has_card(Card::ProfessorPlum));
+        assert_eq!(None, clue_engine.player_data[5].has_card(Card::Hall));
+    }
+
+    #[test]
+    fn test_suggest_no_refute() {
+        let mut clue_engine = ClueEngine::new(3);
+
+        clue_engine.learn_suggest(1, Card::ProfessorPlum, Card::Knife, Card::Hall, None, None);
+        clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
+
+        assert_eq!(Some(true), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ProfessorPlum));
+        assert_eq!(Some(false), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ColonelMustard));
+        assert_eq!(None, clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::Knife));
+        assert_eq!(None, clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::Hall));
+        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
+        assert_eq!(None, clue_engine.player_data[1].has_card(Card::Knife));
+        assert_eq!(Some(false), clue_engine.player_data[0].has_card(Card::Knife));
+        assert_eq!(Some(false), clue_engine.player_data[2].has_card(Card::Knife));
+    }
+
+    #[test]
+    fn test_possible_cards_1() {
+        let mut clue_engine = ClueEngine::new(6);
+        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
+        assert_eq!(make_usize_set(vec![0,3,4,5,6]), clue_engine.who_has_card(Card::ProfessorPlum));
+        assert_eq!(1, clue_engine.player_data[3].possible_cards.len());
+        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife, Card::Hall]), clue_engine.player_data[3].possible_cards[0]);
+
+        clue_engine.learn_info_on_card(3, Card::Hall, true, true);
+        assert_eq!(make_usize_set(vec![3]), clue_engine.who_has_card(Card::Hall));
+        assert_eq!(Some(true), clue_engine.player_data[3].has_card(Card::Hall));
+        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
+    }
+
+    #[test]
+    fn test_possible_cards_2() {
+        let mut clue_engine = ClueEngine::new(6);
+        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
+        clue_engine.learn_info_on_card(3, Card::Hall, false, true);
+        assert_eq!(Some(false), clue_engine.player_data[3].has_card(Card::Hall));
+        assert_eq!(1, clue_engine.player_data[3].possible_cards.len());
+        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife]), clue_engine.player_data[3].possible_cards[0]);
+        
+        clue_engine.learn_info_on_card(3, Card::ProfessorPlum, false, true);
+        assert_eq!(Some(false), clue_engine.player_data[3].has_card(Card::ProfessorPlum));
+        assert_eq!(make_usize_set(vec![3]), clue_engine.who_has_card(Card::Knife));
+        assert_eq!(Some(true), clue_engine.player_data[3].has_card(Card::Knife));
+        assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
+    }
 
     #[test]
     fn test_number_of_cards() {
