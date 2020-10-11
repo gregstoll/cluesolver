@@ -344,6 +344,8 @@ impl ClueEngine {
                 player.not_has_cards.insert(card);
             }
             changed_cards.insert(card);
+            let other_changed_cards = self.examine_clauses(player_index, Some(card));
+            changed_cards.extend(other_changed_cards.iter());
         }
         if update_engine {
             changed_cards.extend(self.check_solution(Some(card)).iter());
@@ -439,8 +441,30 @@ impl ClueEngine {
                 }
             }
             else if self.player_data[player_index].has_cards.len() + self.player_data[player_index].possible_cards.len() > (number_of_cards as usize) {
-                // We may be able to learn something
-                //TODOTODO - finish
+                // We may be able to figure out something
+                let num_accounted_for = number_of_cards as usize - self.player_data[player_index].has_cards.len();
+                let card_clauses = Self::transpose_clauses(&self.player_data[player_index].possible_cards);
+                //TODO - this is weird. why do we transpose_clauses and then basically ignore the result?
+                for test_card in card_clauses.keys() {
+                    // See if we could have this card, by contradiction.
+                    // Assume we don't have this card.  Remove it from
+                    // all clauses.
+                    let new_clauses = Self::remove_card_from_clauses(&self.player_data[player_index].possible_cards, *test_card);
+                    // If there are any empty clauses we have a contradiction already.
+                    let is_possible;
+                    if new_clauses.iter().any(|clause| clause.len() == 0) {
+                        is_possible = false;
+                    } else {
+                        // See if it's possible to satisfy the rest of the clauses with one fewer card.
+                        is_possible = Self::can_satisfy(&new_clauses, num_accounted_for - 1);
+                    }
+                    if !is_possible {
+                        // We found a contradiction if we don't have this card,
+                        // so we must have this card.
+                        let other_changed_cards = self.learn_info_on_card(player_index, *test_card, true, true);
+                        changed_cards.extend(other_changed_cards.iter());
+                    }
+                }
             }
         }
         return changed_cards;
@@ -637,7 +661,7 @@ impl ClueEngine {
 
     fn is_consistent(self: &Self) -> bool {
         for player in self.player_data.iter() {
-            if player.has_cards.intersection(&player.not_has_cards).any(|&x| true) {
+            if player.has_cards.intersection(&player.not_has_cards).any(|_x| true) {
                 return false;
             }
         }
