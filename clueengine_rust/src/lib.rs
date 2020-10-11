@@ -942,6 +942,26 @@ mod tests {
     }
 
     #[test]
+    fn test_load_from_string_has_and_not_has() {
+        let clue_engine = ClueEngine::load_from_string("29A-B.9L-C.3U-.");
+        assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
+        assert_eq!(Some(false), clue_engine.player_data[0].has_card(Card::ColonelMustard));
+        assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::Wrench));
+        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::MrGreen));
+        assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::BilliardRoom));
+    }
+
+    #[test]
+    fn test_load_from_string_some_clauses() {
+        let clue_engine = ClueEngine::load_from_string("29-.9A-B-CDE-FGH.3U-.");
+        assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
+        assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ColonelMustard));
+        assert_eq!(2, clue_engine.player_data[1].possible_cards.len());
+        assert_eq!(HashSet::from_iter(vec!['C', 'D', 'E'].iter().map(|ch| CardUtils::card_from_char(*ch))), clue_engine.player_data[1].possible_cards[0]);
+        assert_eq!(HashSet::from_iter(vec!['F', 'G', 'H'].iter().map(|ch| CardUtils::card_from_char(*ch))), clue_engine.player_data[1].possible_cards[1]);
+    }
+
+    #[test]
     fn test_load_from_string_then_write_to_string_1() {
         assert_load_from_string_then_write_to_string_match("29AH-BCD-KL-MN.9-AH.3-AH.");
     }
@@ -1227,6 +1247,50 @@ mod tests {
         assert_eq!(make_usize_set(vec![2]), clue_engine.who_has_card(Card::Knife));
         assert_eq!(Some(true), clue_engine.player_data[2].has_card(Card::Knife));
         assert_eq!(0, clue_engine.player_data[2].possible_cards.len());
+    }
+
+    #[test]
+    fn test_eliminate_extra_clauses() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
+        clue_engine.learn_info_on_card(2, Card::Hall, false, true);
+        assert_eq!(1, clue_engine.player_data[2].possible_cards.len());
+        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife]), clue_engine.player_data[2].possible_cards[0]);
+
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Lounge, Some(2), None);
+
+        assert_eq!(1, clue_engine.player_data[2].possible_cards.len());
+        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::Knife]), clue_engine.player_data[2].possible_cards[0]);
+    }
+
+    #[test]
+    fn test_shared_clause_1() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_info_on_card(1, Card::Hall, false, true);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(1), None);
+        clue_engine.learn_suggest(2, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
+
+        clue_engine.learn_info_on_card(3, Card::Hall, false, true);
+
+        // No one else should have ProfessorPlum or Knife
+        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::ProfessorPlum));
+        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::Knife));
+        assert_eq!(make_usize_set(vec![0, 2, 4, 5, 6]), clue_engine.who_has_card(Card::Hall));
+    }
+
+    #[test]
+    fn test_shared_clause_2() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_info_on_card(1, Card::Hall, false, true);
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(1), None);
+        clue_engine.learn_info_on_card(3, Card::Hall, false, true);
+
+        clue_engine.learn_suggest(2, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
+
+        // No one else should have ProfessorPlum or Knife
+        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::ProfessorPlum));
+        assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::Knife));
+        assert_eq!(make_usize_set(vec![0, 2, 4, 5, 6]), clue_engine.who_has_card(Card::Hall));
     }
 
 }
