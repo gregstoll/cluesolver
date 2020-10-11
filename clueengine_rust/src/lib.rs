@@ -148,7 +148,7 @@ pub struct PlayerData {
 }
 
 impl PlayerData {
-    pub(crate) fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
+    pub fn new(num_cards: Option<u8>, is_solution_player: bool) -> PlayerData {
         return PlayerData {
             has_cards: HashSet::new(),
             not_has_cards: HashSet::new(),
@@ -158,7 +158,7 @@ impl PlayerData {
         };
     }
 
-    pub(crate) fn write_to_string(self: &PlayerData) -> String {
+    pub fn write_to_string(self: &PlayerData) -> String {
         let mut s = String::from("");
 
         let num_cards_to_write = self.num_cards.unwrap_or(0);
@@ -187,10 +187,10 @@ impl PlayerData {
     }
 
 
-    pub(crate) fn eliminate_extraneous_clauses(self: &mut PlayerData) {
+    pub fn eliminate_extraneous_clauses(self: &mut PlayerData) {
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut self.possible_cards);
     }
-    pub(crate) fn eliminate_extraneous_clauses_possible_cards(possible_cards: &mut Vec<CardSet>) {
+    pub fn eliminate_extraneous_clauses_possible_cards(possible_cards: &mut Vec<CardSet>) {
         let mut need_to_call_again = false;
         // This is O(n^2), but hopefully there aren't too many of these
         'outer: for i in 0..possible_cards.len() {
@@ -249,7 +249,7 @@ impl ClueEngine {
         &mut self.player_data[index]
     }
 
-    pub(crate) fn number_of_player_cards(player_index: u8, num_players: u8) -> u8 {
+    pub fn number_of_player_cards(player_index: u8, num_players: u8) -> u8 {
         if player_index == num_players {
             // The case file always has exactly 3 cards
             return 3
@@ -494,7 +494,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    pub(crate) fn transpose_clauses(possible_cards: &Vec<CardSet>) -> HashMap<Card, HashSet<usize>> {
+    pub fn transpose_clauses(possible_cards: &Vec<CardSet>) -> HashMap<Card, HashSet<usize>> {
         let mut transposed_clauses: HashMap<Card, HashSet<usize>> = HashMap::new();
         for i in 0..possible_cards.len() {
             let clause = &possible_cards[i];
@@ -512,7 +512,7 @@ impl ClueEngine {
         return transposed_clauses;
     }
 
-    pub(crate) fn remove_card_from_clauses(clauses: &Vec<CardSet>, card: Card) -> Vec<CardSet> {
+    pub fn remove_card_from_clauses(clauses: &Vec<CardSet>, card: Card) -> Vec<CardSet> {
         let mut new_clauses = vec!();
         new_clauses.reserve(clauses.len());
         for clause in clauses {
@@ -525,7 +525,7 @@ impl ClueEngine {
 
     // Returns whether there's a set of choices that can satisfy all these clauses,
     // given we can only use up to num_accounted_for cards.
-    pub(crate) fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: usize) -> bool {
+    pub fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: usize) -> bool {
         if clauses.len() == 0 {
             return true;
         }
@@ -548,7 +548,7 @@ impl ClueEngine {
         return false;
     }
 
-    pub(crate) fn remove_clauses_with_indices(clauses: &Vec<CardSet>, indices_to_remove: &HashSet<usize>) -> Vec<CardSet> {
+    pub fn remove_clauses_with_indices(clauses: &Vec<CardSet>, indices_to_remove: &HashSet<usize>) -> Vec<CardSet> {
         let mut new_clauses = vec!();
         for i in 0..clauses.len() {
             if !indices_to_remove.contains(&i) {
