@@ -71,6 +71,11 @@ impl CardUtils {
         return (0..CARD_LAST).map(|x| FromPrimitive::from_i32(x).unwrap());
     }
 
+    const ALL_CARD_TYPES: [CardType;3] = [CardType::Suspect, CardType::Weapon, CardType::Room];
+    pub fn all_card_types() -> impl Iterator<Item=&'static CardType> {
+        return ALL_CARD_TYPES.iter();
+    }
+
     pub fn cards_of_type(card_type: CardType) -> impl Iterator<Item=Card> {
         let int_range = match card_type {
             CardType::Suspect => (CardType::Suspect as u8)..(CardType::Weapon as u8),
@@ -134,6 +139,7 @@ impl<'a> Tokenizer<'a> {
 }
 
 
+#[derive(Clone,Debug)]
 pub struct PlayerData {
     // A set of cards that the player is known to have
     pub has_cards: CardSet,
@@ -220,6 +226,7 @@ impl PlayerData {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ClueEngine {
     pub player_data: Vec<PlayerData>,
 }
@@ -681,6 +688,60 @@ impl ClueEngine {
             }
         }
         return changed_cards;
+    }
+
+    pub fn do_simulation(self: &Self) -> HashMap<Card, Vec<usize>> {
+        let mut simulation_data = HashMap::new();
+        self.initialize_simulation_data(&mut simulation_data);
+        let mut number_of_simulations = 0;
+        if self.player_data.iter().any(|player| player.num_cards == None) {
+            // Can't do simulations if we don't know how many cards everyone has
+            return simulation_data;
+        }
+        // Find a solution to simulate.
+        // FFV - this iteration could be more generalized
+        let mut solution_possibilities: HashMap<CardType, Vec<Card>> = HashMap::new();
+        let solution_cards = &self.player_data[self.number_of_real_players()].has_cards;
+        let not_solution_cards = &self.player_data[self.number_of_real_players()].not_has_cards;
+        for card_type in CardUtils::all_card_types() {
+            let mut already_found_solution_iter = solution_cards.iter().filter(|&card| CardUtils::card_type(*card) == *card_type);
+            let already_found_solution = already_found_solution_iter.next();
+            if already_found_solution != None {
+                // We know what the solution is for this card already
+                solution_possibilities.insert(*card_type, vec![*(already_found_solution.unwrap())]);
+            }
+            else {
+                // Take all possible cards, except for the ones we know aren't
+                // solutions
+                let all_possible_cards = CardUtils::cards_of_type(*card_type).collect::<HashSet<Card>>();
+                solution_possibilities.insert(*card_type, all_possible_cards.iter().filter_map(|&card| if !not_solution_cards.contains(&card) {None } else {Some(card)}).collect());
+            }
+        }
+        let total_iterations = 2000;
+        let iterations_per_solution = total_iterations / solution_possibilities.values().map(|cards| cards.len()).fold(1, |x, y| x*y);
+        for card1 in solution_possibilities.get(&CardType::Suspect).unwrap() {
+            for card2 in solution_possibilities.get(&CardType::Weapon).unwrap() {
+                for card3 in solution_possibilities.get(&CardType::Room).unwrap() {
+                    let current_solution: [Card; 3] = [*card1, *card2, *card3];
+                    let mut engine_copy = self.clone();
+                    for solution_card in current_solution.iter() {
+                        engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *solution_card, true, true);
+                    }
+                    // Find the available free cards.
+                    // TODOTODO - finish
+                }
+            }
+        }
+
+        
+        return simulation_data;
+    }
+
+    fn initialize_simulation_data(self: &Self, data: &mut HashMap<Card, Vec<usize>>) {
+        for card in CardUtils::all_cards() {
+            let zeros = (0..(self.player_data.len())).map(|_| 0).collect();
+            data.insert(card, zeros);
+        }
     }
 
     pub fn is_consistent(self: &Self) -> bool {
