@@ -575,7 +575,6 @@ impl ClueEngine {
 
     // TODO - document this
     fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
-        // TODO - this method is really long
         let mut changed_cards: CardSet = HashSet::new();
         if let Some(real_card) = card {
             changed_cards.extend(self.check_for_all_players_but_one_dont_have_this_card(real_card).iter());
@@ -612,7 +611,14 @@ impl ClueEngine {
                 }
             }
         }
+
         // Finally, see if any people share clauses in common.
+        changed_cards.extend(self.check_for_overlapping_clauses());
+        return changed_cards;
+    }
+
+    fn check_for_overlapping_clauses(self: &mut Self) -> CardSet {
+        let mut changed_cards: CardSet = HashSet::new();
         let mut clause_hash: HashMap<String, Vec<usize>> = HashMap::new();
         for idx in 0..self.number_of_real_players() {
             let player = &self.player_data[idx as usize];
