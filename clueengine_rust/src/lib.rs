@@ -473,7 +473,7 @@ impl ClueEngine {
             }
             else if self.player_data[player_index].has_cards.len() + self.player_data[player_index].possible_cards.len() > (number_of_cards as usize) {
                 // We may be able to figure out something
-                let num_accounted_for = number_of_cards as usize - self.player_data[player_index].has_cards.len();
+                let num_accounted_for = number_of_cards as isize - self.player_data[player_index].has_cards.len() as isize;
                 let card_clauses = Self::transpose_clauses(&self.player_data[player_index].possible_cards);
                 //TODO - this is weird. why do we transpose_clauses and then basically ignore the result?
                 for test_card in card_clauses.keys() {
@@ -532,11 +532,11 @@ impl ClueEngine {
 
     // Returns whether there's a set of choices that can satisfy all these clauses,
     // given we can only use up to num_accounted_for cards.
-    pub fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: usize) -> bool {
+    pub fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: isize) -> bool {
         if clauses.len() == 0 {
             return true;
         }
-        if num_unaccounted_for == 0 {
+        if num_unaccounted_for <= 0 {
             return false;
         }
         // See if there's any way we can satisfy these

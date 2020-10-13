@@ -323,6 +323,7 @@ mod tests {
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
 
         let simulation_data = clue_engine.do_simulation();
+
         let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
         assert_eq!(0, plum_data[1]);
         for i in 0..(clue_engine.number_of_real_players() + 1) {
@@ -330,5 +331,49 @@ mod tests {
                 assert!(plum_data[i] > 0);
             }
         }
+    }
+    
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulation_trickycase1_hasresults() {
+        let clue_engine = ClueEngine::load_from_string("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.");
+
+        let simulation_data = clue_engine.do_simulation();
+
+        // no clauses here, so all simulations should succeed
+        let solution_configurations = 2*4*6;
+        let expected_num_simulations = (2000 / solution_configurations) * solution_configurations;
+        for card in simulation_data.keys() {
+            let number_of_simulations: usize = simulation_data.get(card).unwrap().iter().sum();
+            assert_eq!(expected_num_simulations, number_of_simulations);
+        }
+    }
+
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulation_trickycase2_has_results() {
+        let clue_engine = ClueEngine::load_from_string("45CPQRS-ABDEFGHIJKLMNOTU.5AGIMT-BCDEFHJKLNOPQRSU.4FK-ACDGIJLMPQRST-EO.4DL-ABCFGIJKMPQRST.3J-ACDFGHIKLMPQRST.");
+
+        let simulation_data = clue_engine.do_simulation();
+
+        for card in simulation_data.keys() {
+            let number_of_simulations: usize = simulation_data.get(card).unwrap().iter().sum();
+            assert!(number_of_simulations > 0);
+        }
+    }
+
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulation_clauses_point_to_card() {
+        let clue_engine = ClueEngine::load_from_string("36-GM.6-GM-AHN-AIO-AJP.6-GM.3GM-HIJKLNOPQRSTU.");
+
+        let simulation_data = clue_engine.do_simulation();
+
+        // In this game player with index 1 has a bunch of clauses that include Professor Plum and other cards,
+        // so it's most likely he has that card
+        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let max = *plum_data.iter().max().unwrap();
+        assert!(max > 0);
+        assert_eq!(max, plum_data[1]);
     }
 }
