@@ -578,50 +578,7 @@ impl ClueEngine {
         // TODO - this method is really long
         let mut changed_cards: CardSet = HashSet::new();
         if let Some(real_card) = card {
-            let mut someone_has_card = false;
-            let mut skip_deduction = false;
-            let mut number_who_dont_have_card = 0;
-            let mut player_who_might_have_card = None;
-            // - Check also for all cards except one in a category are
-            // accounted for.
-            for i in 0..self.player_data.len() {
-                let player = &mut self.player_data[i];
-                let has_card = player.has_card(real_card);
-                match has_card {
-                    Some(true) => {
-                        // Someone has the card, so the solution is not this.
-                        someone_has_card = true;
-                        break;
-                    },
-                    Some(false) => {
-                        number_who_dont_have_card += 1;
-                    },
-                    None => {
-                        if player_who_might_have_card == None {
-                            player_who_might_have_card = Some(i);
-                        } else {
-                            // The solution is not this, but someone might still
-                            // have it.
-                            skip_deduction = true;
-                        }
-                    }
-                }
-            }
-            if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
-                // Every player except one doesn't have this card, so we know the player has it.
-                let other_changed_cards = self.learn_info_on_card(player_who_might_have_card.unwrap(), real_card, true, false);
-                changed_cards.extend(other_changed_cards.iter());
-            }
-            else if someone_has_card {
-                // Someone has this card, so no one else does. (including solution)
-                for i in 0..self.player_data.len() {
-                    let player = &self.player_data[i];
-                    if player.has_card(real_card) == None {
-                        let other_changed_cards = self.learn_info_on_card(i, real_card, false, false);
-                        changed_cards.extend(other_changed_cards.iter());
-                    }
-                }
-            }
+            changed_cards.extend(self.check_for_all_cards_but_one_accounted_for(real_card).iter());
         }
 
         for card_type in CardUtils::all_card_types() {
@@ -692,6 +649,55 @@ impl ClueEngine {
                             }
                         }
                     }
+                }
+            }
+        }
+        return changed_cards;
+    }
+
+    fn check_for_all_cards_but_one_accounted_for(self: &mut Self, card: Card) -> CardSet {
+        let mut changed_cards: CardSet = HashSet::new();
+        let mut someone_has_card = false;
+        let mut skip_deduction = false;
+        let mut number_who_dont_have_card = 0;
+        let mut player_who_might_have_card = None;
+        // - Check also for all cards except one in a category are
+        // accounted for.
+        for i in 0..self.player_data.len() {
+            let player = &mut self.player_data[i];
+            let has_card = player.has_card(card);
+            match has_card {
+                Some(true) => {
+                    // Someone has the card, so the solution is not this.
+                    someone_has_card = true;
+                    break;
+                },
+                Some(false) => {
+                    number_who_dont_have_card += 1;
+                },
+                None => {
+                    if player_who_might_have_card == None {
+                        player_who_might_have_card = Some(i);
+                    } else {
+                        // The solution is not this, but someone might still
+                        // have it.
+                        skip_deduction = true;
+                    }
+                }
+            }
+        }
+        if !skip_deduction && !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
+            // Every player except one doesn't have this card, so we know the player has it.
+            let other_changed_cards = self.learn_info_on_card(player_who_might_have_card.unwrap(), card, true, false);
+            changed_cards.extend(other_changed_cards.iter());
+        }
+        else if someone_has_card {
+            // Someone has this card, so no one else does. (including solution)
+            for i in 0..self.player_data.len() {
+                let player = &self.player_data[i];
+                if player.has_card(card) == None {
+                    let other_changed_cards = self.learn_info_on_card(i, card, false, false);
+                    changed_cards.extend(other_changed_cards.iter());
                 }
             }
         }
