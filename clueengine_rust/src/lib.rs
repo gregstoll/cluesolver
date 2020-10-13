@@ -645,7 +645,7 @@ impl ClueEngine {
                 let solution = solution_card.unwrap();
                 if self.solution_player().has_card(solution) == None {
                     // also check to make sure we don't have another one in this category
-                    // TODO - should we assert if this happens?
+                    // (if this happened, we're inconsistent already, just move on)
                     if all_cards.iter().all(|c| !self.solution_player().has_cards.contains(c)) {
                         self.solution_player_mut().has_cards.insert(solution);
                         changed_cards.insert(solution);
