@@ -71,7 +71,7 @@ impl CardUtils {
         return (0..CARD_LAST).map(|x| FromPrimitive::from_i32(x).unwrap());
     }
 
-    const ALL_CARD_TYPES: [CardType;3] = [CardType::Suspect, CardType::Weapon, CardType::Room];
+    // TODO - remove other uses of ALL_CARD_TYPES
     pub fn all_card_types() -> impl Iterator<Item=&'static CardType> {
         return ALL_CARD_TYPES.iter();
     }
@@ -693,7 +693,6 @@ impl ClueEngine {
     pub fn do_simulation(self: &Self) -> HashMap<Card, Vec<usize>> {
         let mut simulation_data = HashMap::new();
         self.initialize_simulation_data(&mut simulation_data);
-        let mut number_of_simulations = 0;
         if self.player_data.iter().any(|player| player.num_cards == None) {
             // Can't do simulations if we don't know how many cards everyone has
             return simulation_data;
@@ -714,7 +713,7 @@ impl ClueEngine {
                 // Take all possible cards, except for the ones we know aren't
                 // solutions
                 let all_possible_cards = CardUtils::cards_of_type(*card_type).collect::<HashSet<Card>>();
-                solution_possibilities.insert(*card_type, all_possible_cards.iter().filter_map(|&card| if !not_solution_cards.contains(&card) {None } else {Some(card)}).collect());
+                solution_possibilities.insert(*card_type, all_possible_cards.iter().filter_map(|&card| if not_solution_cards.contains(&card) {None } else {Some(card)}).collect());
             }
         }
         let total_iterations = 2000;
@@ -728,12 +727,52 @@ impl ClueEngine {
                         engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *solution_card, true, true);
                     }
                     // Find the available free cards.
-                    // TODOTODO - finish
+                    let mut available_cards: CardSet = CardUtils::all_cards().collect();
+                    for player in engine_copy.player_data.iter() {
+                        for has_card in player.has_cards.iter() {
+                            available_cards.remove(has_card);
+                        }
+                    }
+                    for _ in 0..iterations_per_solution {
+                        //TODO - find a rust-y way to make this less error-prone
+                        let mut temp_engine = engine_copy.clone();
+                        let mut temp_available_cards = available_cards.clone();
+                        // Assign all values randomly.
+                        for player_index in 0..temp_engine.number_of_real_players() {
+                            let player = &temp_engine.player_data[player_index];
+                            let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
+                            let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+                            // If there are not enough cards available, we're
+                            // inconsistent.
+                            if player_cards_available.len() < num_cards_needed {
+                                temp_available_cards.clear();
+                            }
+                            else {
+                                for _ in 0..num_cards_needed {
+                                    let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
+                                    let card_to_add = player_cards_available.remove(index);
+                                    temp_available_cards.remove(&card_to_add);
+                                    temp_engine.learn_info_on_card(player_index, card_to_add, true, true);
+                                }
+                            }
+                        }
+                        // All players assigned.  Check consistency.
+                        let is_consistent = temp_engine.player_data.iter().all(|player| {
+                            let have_and_not_have_card = player.has_cards.intersection(&player.not_has_cards).any(|_| true);
+                            let wrong_number_of_cards = player.has_cards.len() != player.num_cards.unwrap() as usize;
+                            return !(have_and_not_have_card || wrong_number_of_cards);
+                        });
+                        if is_consistent {
+                            for player_index in 0..temp_engine.player_data.len() {
+                                for card in temp_engine.player_data[player_index].has_cards.iter() {
+                                    simulation_data.get_mut(card).unwrap()[player_index] += 1;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        
         return simulation_data;
     }
 

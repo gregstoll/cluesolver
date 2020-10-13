@@ -299,4 +299,36 @@ mod tests {
         assert_eq!(make_usize_set(vec![1, 3]), clue_engine.who_has_card(Card::Knife));
         assert_eq!(make_usize_set(vec![0, 2, 4, 5, 6]), clue_engine.who_has_card(Card::Hall));
     }
+
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulation_known_person_has_card() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_info_on_card(1, Card::ProfessorPlum, true, true);
+
+        let simulation_data = clue_engine.do_simulation();
+        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        assert!(plum_data[1] > 0);
+        for i in 0..(clue_engine.number_of_real_players() + 1) {
+            if i != 1 {
+                assert_eq!(0, plum_data[i]);
+            }
+        }
+    }
+
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulation_known_person_does_not_have_card() {
+        let mut clue_engine = ClueEngine::new(6);
+        clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
+
+        let simulation_data = clue_engine.do_simulation();
+        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        assert_eq!(0, plum_data[1]);
+        for i in 0..(clue_engine.number_of_real_players() + 1) {
+            if i != 1 {
+                assert!(plum_data[i] > 0);
+            }
+        }
+    }
 }
