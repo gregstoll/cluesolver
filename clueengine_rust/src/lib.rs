@@ -438,30 +438,34 @@ impl ClueEngine {
         let mut changed_cards = HashSet::new();
         if let Some(real_card) = card {
             let player = &mut self.player_data[player_index];
-            // TODO - reexamine this and simplify after it's working
-            let mut possible_cards_copy = player.possible_cards.clone();
-            //for clause in possible_cards_copy {
-            let mut adjustment = 0;
-            for i in 0..possible_cards_copy.len() {
-                let clause = &mut possible_cards_copy[i];
+            // Iterate over all the clauses, but since we might be removing
+            // things from the Vec, keep track of the current index manually.
+            let mut i: usize = 0;
+            while i < player.possible_cards.len() {
+                let clause = &mut player.possible_cards[i];
+                let mut skip_increment = false;
                 if clause.contains(&real_card) {
                     if player.has_cards.contains(&real_card) {
                         // We have this card, so this clause is done
-                        player.possible_cards.remove(i - adjustment);
-                        adjustment += 1;
+                        player.possible_cards.remove(i);
+                        // adjust loop counter
+                        skip_increment = true;
                     }
                     else if player.not_has_cards.contains(&real_card) {
-                        (&mut player.possible_cards[i - adjustment]).remove(&real_card);
                         clause.remove(&real_card);
                         if clause.len() == 1 {
                             // We have this card!
                             let have_card = clause.iter().next().unwrap();
                             player.has_cards.insert(*have_card);
                             changed_cards.insert(*have_card);
-                            player.possible_cards.remove(i - adjustment);
-                            adjustment += 1;
+                            player.possible_cards.remove(i);
+                            // adjust loop counter
+                            skip_increment = true;
                         }
                     }
+                }
+                if !skip_increment {
+                    i += 1;
                 }
             }
         }
@@ -477,9 +481,10 @@ impl ClueEngine {
             else if self.player_data[player_index].has_cards.len() + self.player_data[player_index].possible_cards.len() > (number_of_cards as usize) {
                 // We may be able to figure out something
                 let num_accounted_for = number_of_cards as isize - self.player_data[player_index].has_cards.len() as isize;
-                let card_clauses = Self::transpose_clauses(&self.player_data[player_index].possible_cards);
-                //TODO - this is weird. why do we transpose_clauses and then basically ignore the result?
-                for test_card in card_clauses.keys() {
+                let card_in_any_clause: &CardSet = &self.player_data[player_index].possible_cards.iter().fold(
+                    HashSet::new(),
+                    |mut set, v| {set.extend(v.iter()); set});
+                for test_card in card_in_any_clause {
                     // See if we could have this card, by contradiction.
                     // Assume we don't have this card.  Remove it from
                     // all clauses.
