@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn test_load_from_string_simple() {
-        let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.");
+        let clue_engine = ClueEngine::load_from_string("29A-.9-.3-.").unwrap();
         assert_eq!(3, clue_engine.player_data.len());
         assert_eq!(2, clue_engine.number_of_real_players());
         assert_eq!(Some(9), clue_engine.player_data[0].num_cards);
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_load_from_string_has_and_not_has() {
-        let clue_engine = ClueEngine::load_from_string("29A-B.9L-C.3U-.");
+        let clue_engine = ClueEngine::load_from_string("29A-B.9L-C.3U-.").unwrap();
         assert_eq!(Some(true), clue_engine.player_data[0].has_card(Card::ProfessorPlum));
         assert_eq!(Some(false), clue_engine.player_data[0].has_card(Card::ColonelMustard));
         assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::Wrench));
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_load_from_string_some_clauses() {
-        let clue_engine = ClueEngine::load_from_string("29-.9A-B-CDE-FGH.3U-.");
+        let clue_engine = ClueEngine::load_from_string("29-.9A-B-CDE-FGH.3U-.").unwrap();
         assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
         assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ColonelMustard));
         assert_eq!(2, clue_engine.player_data[1].possible_cards.len());
@@ -97,13 +97,55 @@ mod tests {
     }
 
     fn assert_load_from_string_then_write_to_string_match(s: &str) {
-        let clue_engine = ClueEngine::load_from_string(s);
+        let clue_engine = ClueEngine::load_from_string(s).unwrap();
         assert_eq!(s, clue_engine.write_to_string());
     }
 
     #[test]
+    fn test_load_from_string_does_not_start_with_number_fails() {
+        if let Ok(_) = ClueEngine::load_from_string("a9-.9-.3-.") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_player_cards_is_not_number_fails() {
+        if let Ok(_) = ClueEngine::load_from_string("2a-.9-.3-.") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_player_has_invalid_card_fails() {
+        if let Ok(_) = ClueEngine::load_from_string("29Y-.9-.3-.") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_no_dash_separating_clauses_fails() {
+        if let Ok(_) = ClueEngine::load_from_string("29-.9-.3.") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_no_ending_period_fails() {
+        if let Ok(_) = ClueEngine::load_from_string("29-.9-.3-") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_not_enough_players_fails() {
+        if let Ok(_) = ClueEngine::load_from_string("39-.9-.3-") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
     fn test_add_card_expect_no_extras() {
-        let mut clue_engine = ClueEngine::load_from_string("63FJQ-ABCDEGHIKLMNOPRSTU.3T-CDFHIJKNOPQS.3-CDFHIJKMNOPQST.3NO-CDFHIJKMPQST.3K-CDFHIJNOPQT.3CD-FJNOQT.3-CDFJNOQT.");
+        let mut clue_engine = ClueEngine::load_from_string("63FJQ-ABCDEGHIKLMNOPRSTU.3T-CDFHIJKNOPQS.3-CDFHIJKMNOPQST.3NO-CDFHIJKMPQST.3K-CDFHIJNOPQT.3CD-FJNOQT.3-CDFJNOQT.").unwrap();
         clue_engine.learn_info_on_card(6, Card::Candlestick, true, true);
 
         assert_eq!(true, clue_engine.is_consistent());
@@ -336,7 +378,7 @@ mod tests {
     #[test]
     #[ignore] // This test is slow
     fn test_simulation_trickycase1_hasresults() {
-        let clue_engine = ClueEngine::load_from_string("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.");
+        let clue_engine = ClueEngine::load_from_string("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.").unwrap();
 
         let simulation_data = clue_engine.do_simulation();
 
@@ -352,7 +394,7 @@ mod tests {
     #[test]
     #[ignore] // This test is slow
     fn test_simulation_trickycase2_has_results() {
-        let clue_engine = ClueEngine::load_from_string("45CPQRS-ABDEFGHIJKLMNOTU.5AGIMT-BCDEFHJKLNOPQRSU.4FK-ACDGIJLMPQRST-EO.4DL-ABCFGIJKMPQRST.3J-ACDFGHIKLMPQRST.");
+        let clue_engine = ClueEngine::load_from_string("45CPQRS-ABDEFGHIJKLMNOTU.5AGIMT-BCDEFHJKLNOPQRSU.4FK-ACDGIJLMPQRST-EO.4DL-ABCFGIJKMPQRST.3J-ACDFGHIKLMPQRST.").unwrap();
 
         let simulation_data = clue_engine.do_simulation();
 
@@ -365,7 +407,7 @@ mod tests {
     #[test]
     #[ignore] // This test is slow
     fn test_simulation_clauses_point_to_card() {
-        let clue_engine = ClueEngine::load_from_string("36-GM.6-GM-AHN-AIO-AJP.6-GM.3GM-HIJKLNOPQRSTU.");
+        let clue_engine = ClueEngine::load_from_string("36-GM.6-GM-AHN-AIO-AJP.6-GM.3GM-HIJKLNOPQRSTU.").unwrap();
 
         let simulation_data = clue_engine.do_simulation();
 

@@ -40,15 +40,17 @@ pub enum CardType {
     Weapon = 6,
     Room  = 12
 }
-const ALL_CARD_TYPES: [CardType; 3] = [CardType::Suspect, CardType::Weapon, CardType::Room];
  
 pub struct CardUtils {
 }
 
 impl CardUtils {
-    fn card_from_char(ch: char) -> Card {
-        let index = ch as u8 - 'A' as u8;
-        return FromPrimitive::from_u8(index).unwrap()
+    fn card_from_char(ch: char) -> Result<Card, ()> {
+        let index = ch as i32 - 'A' as i32;
+        if index < 0 || index >= CARD_LAST {
+            return Err(());
+        }
+        return FromPrimitive::from_i32(index).ok_or(());
     }
 
     fn char_from_card(card: Card) -> char {
@@ -71,8 +73,8 @@ impl CardUtils {
         return (0..CARD_LAST).map(|x| FromPrimitive::from_i32(x).unwrap());
     }
 
-    // TODO - remove other uses of ALL_CARD_TYPES
     pub fn all_card_types() -> impl Iterator<Item=&'static CardType> {
+        const ALL_CARD_TYPES: [CardType; 3] = [CardType::Suspect, CardType::Weapon, CardType::Room];
         return ALL_CARD_TYPES.iter();
     }
 
@@ -128,8 +130,8 @@ impl<'a> Tokenizer<'a> {
         ch
     }
 
-    pub fn next_digit(&mut self) -> u8 {
-        return self.next().unwrap().to_digit(10).unwrap() as u8;
+    pub fn next_digit(&mut self) -> Result<u8, ()> {
+        return Ok(self.next().ok_or(())?.to_digit(10).ok_or(())? as u8);
     }
 
     /// Returns the next character without advancing
@@ -280,14 +282,14 @@ impl ClueEngine {
         return s;
     }
 
-    pub fn load_from_string(s: &str) -> ClueEngine {
+    pub fn load_from_string(s: &str) -> Result<ClueEngine,()> {
         let mut tokenizer = Tokenizer::new(s);
-        let number_of_players = tokenizer.next_digit();
+        let number_of_players = tokenizer.next_digit()?;
         let mut clue_engine = ClueEngine::new(number_of_players);
         for i in 0..(number_of_players+1) {
-            clue_engine.load_player_from_string(i as usize, &mut tokenizer);
+            clue_engine.load_player_from_string(i as usize, &mut tokenizer)?;
         }
-        return clue_engine;
+        return Ok(clue_engine);
     }
 
     // format is (concatenated)
@@ -299,38 +301,39 @@ impl ClueEngine {
     // one letter per card in possible_clauses
     //  (each possible_clause is separated by '-')
     // '.'
-    fn load_player_from_string(self: &mut ClueEngine, player_index: usize, tokenizer: &mut Tokenizer) {
+    fn load_player_from_string(self: &mut ClueEngine, player_index: usize, tokenizer: &mut Tokenizer) -> Result<(), ()> {
         {
-            let num_cards = tokenizer.next_digit() as u8;
+            let num_cards = tokenizer.next_digit()?;
             (&mut self.player_data[player_index]).num_cards = if num_cards == 0 { None } else { Some(num_cards)};
         }
         // Load the list of cards this player has
-        while *tokenizer.peek().unwrap() != '-' {
-            self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), true, true);
+        while *tokenizer.peek().ok_or(())? != '-' {
+            self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().ok_or(())?)?, true, true);
         }
         // advance past the '-'
         tokenizer.next();
         // Load the list of cards this player doesn't have
         {
-            let mut next_char = *tokenizer.peek().unwrap();
+            let mut next_char = *tokenizer.peek().ok_or(())?;
             while next_char != '-' && next_char != '.' {
-                self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().unwrap()), false, true);
-                next_char = *tokenizer.peek().unwrap();
+                self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().ok_or(())?)?, false, true);
+                next_char = *tokenizer.peek().ok_or(())?;
             }
         }
         // Load the list of clauses as long as it's not done
-        // TODO - assert this is '-' if it's not '.'?
-        while tokenizer.next().unwrap() != '.' {
+        while tokenizer.next().ok_or(())? != '.' {
             let mut clause = HashSet::new();
-            let mut next_char = *tokenizer.peek().unwrap();
+            let mut next_char = *tokenizer.peek().ok_or(())?;
             while next_char != '-' && next_char != '.' {
-                clause.insert(CardUtils::card_from_char(tokenizer.next().unwrap()));
-                next_char = *tokenizer.peek().unwrap();
+                clause.insert(CardUtils::card_from_char(tokenizer.next().ok_or(())?)?);
+                next_char = *tokenizer.peek().ok_or(())?;
             }
             if !clause.is_empty() {
                 self.learn_has_one_of_cards(player_index, &clause);
             }
         }
+        
+        Ok(())
     }
 
     pub fn learn_info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
@@ -616,7 +619,7 @@ impl ClueEngine {
             }
         }
 
-        for card_type in ALL_CARD_TYPES.iter() {
+        for card_type in CardUtils::all_card_types() {
             let all_cards = CardUtils::cards_of_type(*card_type).collect::<Vec<Card>>();
             let mut solution_card: Option<Card> = None;
             let mut is_solution = true;
@@ -672,12 +675,12 @@ impl ClueEngine {
             // a card in that clause.
             if clause.len() <= players.len() {
                 let affected_people: HashSet<usize> = HashSet::from_iter(players.iter().map(|x| *x));
-                for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
+                for card in clause.chars().map(|ch| CardUtils::card_from_char(ch).unwrap()) {
                     changed_cards.insert(card);
                 }
                 for idx in 0..(self.number_of_real_players() + 1) {
                     if !affected_people.contains(&idx) {
-                        for card in clause.chars().map(|ch| CardUtils::card_from_char(ch)) {
+                        for card in clause.chars().map(|ch| CardUtils::card_from_char(ch).unwrap()) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
                                 let other_changed_cards = self.learn_info_on_card(idx as usize, card, false, false);
                                 changed_cards.extend(other_changed_cards.iter());
@@ -864,30 +867,32 @@ mod tests {
         assert_eq!('U', CardUtils::char_from_card(Card::BilliardRoom));
         for i in ('A' as u8)..('V' as u8) {
             let ch = i as char;
-            assert_eq!(ch, CardUtils::char_from_card(CardUtils::card_from_char(ch)));
+            assert_eq!(ch, CardUtils::char_from_card(CardUtils::card_from_char(ch).unwrap()));
         }
     }
 
     #[test]
-    #[should_panic]
     fn test_card_from_char_on_char_below_a_panics() {
-        let _ch = CardUtils::card_from_char('0');
+        if let Ok(_) = CardUtils::card_from_char('0') {
+            panic!("Should not parse!");
+        }
     }
     #[test]
-    #[should_panic]
     fn test_card_from_char_on_char_above_u_panics() {
-        let _ch = CardUtils::card_from_char('V');
+        if let Ok(_) = CardUtils::card_from_char('V') {
+            panic!("Should not parse!");
+        }
     }
 
     #[test]
     fn test_card_from_char() {
-        assert_eq!(Card::ProfessorPlum, CardUtils::card_from_char('A'));
-        assert_eq!(Card::ColonelMustard, CardUtils::card_from_char('B'));
-        assert_eq!(Card::MrsPeacock, CardUtils::card_from_char('F'));
-        assert_eq!(Card::Knife, CardUtils::card_from_char('G'));
-        assert_eq!(Card::Wrench, CardUtils::card_from_char('L'));
-        assert_eq!(Card::Hall, CardUtils::card_from_char('M'));
-        assert_eq!(Card::BilliardRoom, CardUtils::card_from_char('U'));
+        assert_eq!(Card::ProfessorPlum, CardUtils::card_from_char('A').unwrap());
+        assert_eq!(Card::ColonelMustard, CardUtils::card_from_char('B').unwrap());
+        assert_eq!(Card::MrsPeacock, CardUtils::card_from_char('F').unwrap());
+        assert_eq!(Card::Knife, CardUtils::card_from_char('G').unwrap());
+        assert_eq!(Card::Wrench, CardUtils::card_from_char('L').unwrap());
+        assert_eq!(Card::Hall, CardUtils::card_from_char('M').unwrap());
+        assert_eq!(Card::BilliardRoom, CardUtils::card_from_char('U').unwrap());
     }
 
     #[test]
