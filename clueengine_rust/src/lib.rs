@@ -1125,5 +1125,4 @@ mod tests {
             make_card_set(vec![Card::Hall])];
         assert_eq!(expected, new_clauses);
     }
-
 }
