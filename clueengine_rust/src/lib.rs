@@ -570,7 +570,7 @@ impl ClueEngine {
         return new_clauses;
     }
 
-    // TODO - document this
+    // Check if any cards are the solution, and also if any clauses are in common.
     fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
         let mut changed_cards: CardSet = HashSet::new();
         if let Some(real_card) = card {
