@@ -489,14 +489,8 @@ impl ClueEngine {
                     // Assume we don't have this card.  Remove it from
                     // all clauses.
                     let new_clauses = Self::remove_card_from_clauses(&self.player_data[player_index].possible_cards, *test_card);
-                    // If there are any empty clauses we have a contradiction already.
-                    let is_possible;
-                    if new_clauses.iter().any(|clause| clause.len() == 0) {
-                        is_possible = false;
-                    } else {
-                        // See if it's possible to satisfy the rest of the clauses with one fewer card.
-                        is_possible = Self::can_satisfy(&new_clauses, num_accounted_for - 1);
-                    }
+                    // See if it's possible to satisfy the rest of the clauses with one fewer card.
+                    let is_possible = Self::can_satisfy(&new_clauses, num_accounted_for - 1);
                     if !is_possible {
                         // We found a contradiction if we don't have this card,
                         // so we must have this card.
@@ -540,19 +534,22 @@ impl ClueEngine {
 
     // Returns whether there's a set of choices that can satisfy all these clauses,
     // given we can only use up to num_accounted_for cards.
-    pub fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: isize) -> bool {
+    fn can_satisfy(clauses: &Vec<CardSet>, num_unaccounted_for: isize) -> bool {
         if clauses.len() == 0 {
             return true;
         }
         if num_unaccounted_for <= 0 {
             return false;
         }
+        // If there are any empty clauses we have a contradiction already.
+        let smallest_clause = clauses.iter().min_by_key(|x| x.len()).unwrap();
+        if smallest_clause.len() == 0 {
+            return false;
+        }
         // See if there's any way we can satisfy these
         // Try one card at a time
-        // TODO - optimize this? this might be a hotspot
-        //  - should be able to use the smallest clause or something
         let card_clauses = ClueEngine::transpose_clauses(clauses);
-        for test_card in card_clauses.keys() {
+        for test_card in smallest_clause {
             // First, remove all clauses containing this card.
             let new_clauses = ClueEngine::remove_clauses_with_indices(clauses, card_clauses.get(test_card).unwrap());
             // See if it's possible to satisfy the rest of the clauses with one fewer card.
@@ -1086,6 +1083,21 @@ mod tests {
             make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(true, ClueEngine::can_satisfy(&clauses, 1));
+    }
+
+    #[test]
+    fn test_can_satisfy_empty_vec() {
+        let clauses: Vec<CardSet> = vec![];
+        assert_eq!(true, ClueEngine::can_satisfy(&clauses, 1));
+    }
+
+    #[test]
+    fn test_can_satisfy_empty_clause() {
+        let clauses: Vec<CardSet> = vec![
+            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
+            make_card_set(vec![])];
+        assert_eq!(false, ClueEngine::can_satisfy(&clauses, 2));
     }
 
     #[test]
