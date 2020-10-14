@@ -742,35 +742,9 @@ impl ClueEngine {
                         }
                     }
                     for _ in 0..iterations_per_solution {
-                        //TODO - find a rust-y way to make this less error-prone
                         let mut temp_engine = engine_copy.clone();
-                        let mut temp_available_cards = available_cards.clone();
-                        // Assign all values randomly.
-                        for player_index in 0..temp_engine.number_of_real_players() {
-                            let player = &temp_engine.player_data[player_index];
-                            let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
-                            let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
-                            // If there are not enough cards available, we're
-                            // inconsistent.
-                            if player_cards_available.len() < num_cards_needed {
-                                temp_available_cards.clear();
-                            }
-                            else {
-                                for _ in 0..num_cards_needed {
-                                    let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
-                                    let card_to_add = player_cards_available.remove(index);
-                                    temp_available_cards.remove(&card_to_add);
-                                    temp_engine.learn_info_on_card(player_index, card_to_add, true, true);
-                                }
-                            }
-                        }
-                        // All players assigned.  Check consistency.
-                        let is_consistent = temp_engine.player_data.iter().all(|player| {
-                            let have_and_not_have_card = player.has_cards.intersection(&player.not_has_cards).any(|_| true);
-                            let wrong_number_of_cards = player.has_cards.len() != player.num_cards.unwrap() as usize;
-                            return !(have_and_not_have_card || wrong_number_of_cards);
-                        });
-                        if is_consistent {
+                        if ClueEngine::do_one_simulation(&mut temp_engine, &available_cards) {
+                            // Results were consistent, so count them
                             for player_index in 0..temp_engine.player_data.len() {
                                 for card in temp_engine.player_data[player_index].has_cards.iter() {
                                     simulation_data.get_mut(card).unwrap()[player_index] += 1;
@@ -782,6 +756,37 @@ impl ClueEngine {
             }
         }
         return simulation_data;
+    }
+
+    // Returns whether the simulation is consistent
+    fn do_one_simulation(engine: &mut ClueEngine, available_cards: &CardSet) -> bool {
+        let mut temp_available_cards = available_cards.clone();
+        // Assign all values randomly.
+        for player_index in 0..engine.number_of_real_players() {
+            let player = &engine.player_data[player_index];
+            let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
+            let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+            // If there are not enough cards available, we're
+            // inconsistent.
+            if player_cards_available.len() < num_cards_needed {
+                return false;
+            }
+            else {
+                for _ in 0..num_cards_needed {
+                    let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
+                    let card_to_add = player_cards_available.remove(index);
+                    temp_available_cards.remove(&card_to_add);
+                    engine.learn_info_on_card(player_index, card_to_add, true, true);
+                }
+            }
+        }
+        // All players assigned.  Check consistency.
+        let is_consistent = engine.player_data.iter().all(|player| {
+            let have_and_not_have_card = player.has_cards.intersection(&player.not_has_cards).any(|_| true);
+            let wrong_number_of_cards = player.has_cards.len() != player.num_cards.unwrap() as usize;
+            return !(have_and_not_have_card || wrong_number_of_cards);
+        });
+        return is_consistent;
     }
 
     fn initialize_simulation_data(self: &Self, data: &mut HashMap<Card, Vec<usize>>) {
