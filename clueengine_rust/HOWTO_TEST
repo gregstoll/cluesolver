@@ -1,0 +1,8 @@
+Here's an easy way to interactively test the CGI server which I learned from https://github.com/rory/rust-cgi:
+
+- cargo build --bin cgi_server
+- Copy from targets/debug/cgi_server to cgi-bin/cgi_server
+- python -m http.server --cgi
+
+Now from a separate command prompt run
+    curl http://localhost:8000/cgi-bin/cgi_server
