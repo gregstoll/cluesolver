@@ -21,11 +21,11 @@ cgi::cgi_main! { |request: cgi::Request| {
     }
     let query = possible_query.unwrap();
     let query_parts: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes()).into_owned().collect();
-    let possible_action = query_parts.get("action");
-    if possible_action == None {
+    let action_result = query_parts.get("action");
+    if action_result == None {
         return error("Internal error - no action specified!");
     }
-    let action = possible_action.unwrap();
+    let action = action_result.unwrap();
     // Valid actions are 'new', 'whoOwns', 'suggestion', 'fullInfo', 'simulate' ('accusation' in the future?)
     // TODO - make this an enum or something
     if action != "new" && action != "whoOwns" && action != "suggestion" && action != "fullInfo" && action != "simulate" {
@@ -36,7 +36,22 @@ cgi::cgi_main! { |request: cgi::Request| {
     }
     let mut engine: clueengine::ClueEngine;
     if action == "new" {
-        //TODO
+        let players_result = query_parts.get("players");
+        if players_result == None {
+            return error("Internal error - action new without players!");
+        }
+        let players_str = players_result.unwrap();
+        let players_int_result = players_str.parse::<u8>();
+        if let Err(_) = players_int_result {
+            return error(&format!("Internal error - couldn't parse players string to u8: {}", players_str));
+        }
+        let num_players = players_int_result.unwrap();
+        engine = clueengine::ClueEngine::new(num_players);
+        for i in 0..num_players {
+            let key = format!("numCards{}", i);
+            // TODO - need a way to specify these to ClueEngine::new()
+            //engine.player_data[i]
+        }
     }
     else {
         let engine_result = clueengine::ClueEngine::load_from_string(query_parts.get("sess").unwrap());
