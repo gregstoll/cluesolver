@@ -13,3 +13,10 @@ rand = "0.7"
 cgi = "0.6"
 json = "0.12"
 url = "2.1"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "simulate_fewconstraints"
+harness = false

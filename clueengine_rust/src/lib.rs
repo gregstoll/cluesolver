@@ -344,6 +344,11 @@ impl ClueEngine {
 
     pub fn learn_info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
+        self.learn_info_on_card_internal(player_index, card, has_card, update_engine, &mut changed_cards);
+        return changed_cards;
+    }
+
+    pub fn learn_info_on_card_internal(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool, changed_cards: &mut CardSet) {
         {
             let player = &mut self.player_data[player_index];
             if has_card {
@@ -353,27 +358,29 @@ impl ClueEngine {
                 player.not_has_cards.insert(card);
             }
             changed_cards.insert(card);
-            let other_changed_cards = self.examine_clauses(player_index, Some(card));
-            changed_cards.extend(other_changed_cards.iter());
+            self.examine_clauses(player_index, Some(card), changed_cards);
         }
         if update_engine {
-            changed_cards.extend(self.check_solution(Some(card)).iter());
+            self.check_solution(Some(card), changed_cards);
         }
         if has_card && self.player_data[player_index].is_solution_player {
             // We know we have no other cards in this category.
             for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
                 if other_card != card {
-                    changed_cards.extend(self.learn_info_on_card(player_index, other_card, false, true).iter());
+                    self.learn_info_on_card_internal(player_index, other_card, false, true, changed_cards);
                 }
             }
         }
-
-        return changed_cards;
     }
 
     pub fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: &CardSet) -> CardSet {
-        let mut clause_helpful = true;
         let mut changed_cards = HashSet::new();
+        self.learn_has_one_of_cards_internal(player_index, cards, &mut changed_cards);
+        return changed_cards;
+    }
+
+    fn learn_has_one_of_cards_internal(self: &mut ClueEngine, player_index: usize, cards: &CardSet, changed_cards: &mut CardSet) {
+        let mut clause_helpful = true;
         let mut new_clause = HashSet::new();
         for card in cards.iter() {
             let has_card = self.player_data[player_index].has_card(*card);
@@ -397,18 +404,21 @@ impl ClueEngine {
             if new_clause.len() == 1 {
                 // We have learned player has this card!
                 let new_card = *new_clause.iter().next().unwrap();
-                let other_changed_cards = self.learn_info_on_card(player_index, new_card, true, true);
-                changed_cards.extend(other_changed_cards.iter());
+                self.learn_info_on_card_internal(player_index, new_card, true, true, changed_cards);
             } else {
                 self.player_data[player_index].possible_cards.push(new_clause);
             }
-            let updated_cards = self.examine_clauses(player_index, None);
-            changed_cards.extend(updated_cards.iter());
+            self.examine_clauses(player_index, None, changed_cards);
         }
+    }
+
+    pub fn learn_suggest(self: &mut ClueEngine, suggesting_player_index: usize, card1: Card, card2: Card, card3: Card, refuting_player_index: Option<usize>, card_shown: Option<Card>) -> CardSet {
+        let mut changed_cards = HashSet::new();
+        self.learn_suggest_internal(suggesting_player_index, card1, card2, card3, refuting_player_index, card_shown, &mut changed_cards);
         return changed_cards;
     }
 
-    pub fn learn_suggest(self: &mut ClueEngine, suggesting_player_index: usize, card1: Card, card2: Card, card3: Card, refuting_player_index: Option<usize>, card_shown: Option<Card>) {
+    fn learn_suggest_internal(self: &mut ClueEngine, suggesting_player_index: usize, card1: Card, card2: Card, card3: Card, refuting_player_index: Option<usize>, card_shown: Option<Card>, changed_cards: &mut CardSet) {
         let mut current_player_index = suggesting_player_index + 1;
         if current_player_index == self.number_of_real_players() as usize {
             current_player_index = 0;
@@ -416,21 +426,21 @@ impl ClueEngine {
         loop {
             if refuting_player_index == Some(current_player_index) {
                 if let Some(real_card) = card_shown {
-                    self.learn_info_on_card(current_player_index, real_card, true, true);
+                    self.learn_info_on_card_internal(current_player_index, real_card, true, true, changed_cards);
                 } else {
                     let possible_cards = HashSet::from_iter(vec![card1, card2, card3].iter().map(|x| *x));
-                    self.learn_has_one_of_cards(current_player_index, &possible_cards);
+                    self.learn_has_one_of_cards_internal(current_player_index, &possible_cards, changed_cards);
                 }
-                self.check_solution(None);
+                self.check_solution(None, changed_cards);
                 return;
             } else if current_player_index == suggesting_player_index {
                 // No one can refute this.  We're done.
-                self.check_solution(None);
+                self.check_solution(None, changed_cards);
                 return;
             } else {
-                self.learn_info_on_card(current_player_index, card1, false, false);
-                self.learn_info_on_card(current_player_index, card2, false, false);
-                self.learn_info_on_card(current_player_index, card3, false, false);
+                self.learn_info_on_card_internal(current_player_index, card1, false, false, changed_cards);
+                self.learn_info_on_card_internal(current_player_index, card2, false, false, changed_cards);
+                self.learn_info_on_card_internal(current_player_index, card3, false, false, changed_cards);
                 current_player_index += 1;
                 if current_player_index == self.number_of_real_players() as usize {
                     current_player_index = 0;
@@ -439,9 +449,8 @@ impl ClueEngine {
         }
     }
 
-    fn examine_clauses(self: &mut ClueEngine, player_index: usize, card: Option<Card>) -> CardSet{
+    fn examine_clauses(self: &mut ClueEngine, player_index: usize, card: Option<Card>, changed_cards: &mut CardSet) {
         self.player_data[player_index].eliminate_extraneous_clauses();
-        let mut changed_cards = HashSet::new();
         if let Some(real_card) = card {
             let player = &mut self.player_data[player_index];
             // Iterate over all the clauses, but since we might be removing
@@ -500,13 +509,11 @@ impl ClueEngine {
                     if !is_possible {
                         // We found a contradiction if we don't have this card,
                         // so we must have this card.
-                        let other_changed_cards = self.learn_info_on_card(player_index, *test_card, true, true);
-                        changed_cards.extend(other_changed_cards.iter());
+                        self.learn_info_on_card_internal(player_index, *test_card, true, true, changed_cards);
                     }
                 }
             }
         }
-        return changed_cards;
     }
 
     pub fn transpose_clauses(possible_cards: &Vec<CardSet>) -> HashMap<Card, HashSet<usize>> {
@@ -577,10 +584,9 @@ impl ClueEngine {
     }
 
     // Check if any cards are the solution, and also if any clauses are in common.
-    fn check_solution(self: &mut Self, card: Option<Card>) -> CardSet {
-        let mut changed_cards: CardSet = HashSet::new();
+    fn check_solution(self: &mut Self, card: Option<Card>, changed_cards: &mut CardSet) {
         if let Some(real_card) = card {
-            changed_cards.extend(self.check_for_all_players_but_one_dont_have_this_card(real_card).iter());
+            self.check_for_all_players_but_one_dont_have_this_card(real_card, changed_cards);
         }
 
         for card_type in CardUtils::all_card_types() {
@@ -616,12 +622,10 @@ impl ClueEngine {
         }
 
         // Finally, see if any people share clauses in common.
-        changed_cards.extend(self.check_for_overlapping_clauses());
-        return changed_cards;
+        self.check_for_overlapping_clauses(changed_cards);
     }
 
-    fn check_for_overlapping_clauses(self: &mut Self) -> CardSet {
-        let mut changed_cards: CardSet = HashSet::new();
+    fn check_for_overlapping_clauses(self: &mut Self, changed_cards: &mut CardSet) {
         let mut clause_hash: HashMap<String, Vec<usize>> = HashMap::new();
         for idx in 0..self.number_of_real_players() {
             let player = &self.player_data[idx as usize];
@@ -647,19 +651,16 @@ impl ClueEngine {
                     if !affected_people.contains(&idx) {
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch).unwrap()) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
-                                let other_changed_cards = self.learn_info_on_card(idx as usize, card, false, false);
-                                changed_cards.extend(other_changed_cards.iter());
+                                self.learn_info_on_card_internal(idx as usize, card, false, false, changed_cards);
                             }
                         }
                     }
                 }
             }
         }
-        return changed_cards;
     }
 
-    fn check_for_all_players_but_one_dont_have_this_card(self: &mut Self, card: Card) -> CardSet {
-        let mut changed_cards: CardSet = HashSet::new();
+    fn check_for_all_players_but_one_dont_have_this_card(self: &mut Self, card: Card, changed_cards: &mut CardSet) {
         let mut someone_has_card = false;
         let mut number_who_dont_have_card = 0;
         let mut player_who_might_have_card = None;
@@ -685,20 +686,17 @@ impl ClueEngine {
         }
         if !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
             // Every player except one doesn't have this card, so we know the player has it.
-            let other_changed_cards = self.learn_info_on_card(player_who_might_have_card.unwrap(), card, true, false);
-            changed_cards.extend(other_changed_cards.iter());
+            self.learn_info_on_card_internal(player_who_might_have_card.unwrap(), card, true, false, changed_cards);
         }
         else if someone_has_card {
             // Someone has this card, so no one else does. (including solution)
             for i in 0..self.player_data.len() {
                 let player = &self.player_data[i];
                 if player.has_card(card) == None {
-                    let other_changed_cards = self.learn_info_on_card(i, card, false, false);
-                    changed_cards.extend(other_changed_cards.iter());
+                    self.learn_info_on_card_internal(i, card, false, false, changed_cards);
                 }
             }
         }
-        return changed_cards;
     }
 
     pub fn do_simulation(self: &Self) -> HashMap<Card, Vec<usize>> {
