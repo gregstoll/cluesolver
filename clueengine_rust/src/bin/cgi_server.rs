@@ -34,5 +34,17 @@ cgi::cgi_main! { |request: cgi::Request| {
     if action != "new" && !query_parts.contains_key("sess") {
         return error("Internal error - missing sess!");
     }
+    let mut engine: clueengine::ClueEngine;
+    if action == "new" {
+        //TODO
+    }
+    else {
+        let engine_result = clueengine::ClueEngine::load_from_string(query_parts.get("sess").unwrap());
+        if let Err(_) = engine_result {
+            return error(&format!("Internal error - invalid session string '{}'!", query_parts.get("sess").unwrap()) );
+        }
+        engine = engine_result.unwrap();
+    }
+    //TODO
     return success(&json::object!{debug: format!("action is {}", query_parts.get("action").unwrap())});
 } }

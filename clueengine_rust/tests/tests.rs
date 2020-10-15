@@ -138,7 +138,21 @@ mod tests {
 
     #[test]
     fn test_load_from_string_not_enough_players_fails() {
-        if let Ok(_) = ClueEngine::load_from_string("39-.9-.3-") {
+        if let Ok(_) = ClueEngine::load_from_string("39-.9-.3-.") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_extra_string_characters() {
+        if let Ok(_) = ClueEngine::load_from_string("29-.9-.3-.1-.") {
+            panic!("Should not have parsed!");
+        }
+    }
+
+    #[test]
+    fn test_load_from_string_empty_string() {
+        if let Ok(_) = ClueEngine::load_from_string("") {
             panic!("Should not have parsed!");
         }
     }

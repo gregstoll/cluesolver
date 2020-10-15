@@ -289,7 +289,13 @@ impl ClueEngine {
         for i in 0..(number_of_players+1) {
             clue_engine.load_player_from_string(i as usize, &mut tokenizer)?;
         }
-        return Ok(clue_engine);
+        // Ensure we've consumed all of the input
+        if tokenizer.peek() == None {
+            return Ok(clue_engine);
+        }
+        else {
+            return Err(());
+        }
     }
 
     // format is (concatenated)
