@@ -170,8 +170,21 @@ mod tests {
     }
 
     #[test]
+    fn test_clueengine_new_number_of_cards_match() {
+        let clue_engine = ClueEngine::new(5, Some(&vec![4, 3, 4, 3, 4])).unwrap();
+
+        assert_eq!(Some(4), clue_engine.player_data[0].num_cards);
+        assert_eq!(Some(3), clue_engine.player_data[1].num_cards);
+        assert_eq!(Some(4), clue_engine.player_data[2].num_cards);
+        assert_eq!(Some(3), clue_engine.player_data[3].num_cards);
+        assert_eq!(Some(4), clue_engine.player_data[4].num_cards);
+        // Solution always has 3 cards
+        assert_eq!(Some(3), clue_engine.player_data[5].num_cards);
+    }
+
+    #[test]
     fn test_simple_suggest() {
-        let mut clue_engine = ClueEngine::new(5);
+        let mut clue_engine = ClueEngine::new(5, None).unwrap();
 
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), Some(Card::Knife));
 
@@ -193,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_suggest_no_refute() {
-        let mut clue_engine = ClueEngine::new(3);
+        let mut clue_engine = ClueEngine::new(3, None).unwrap();
 
         clue_engine.learn_suggest(1, Card::ProfessorPlum, Card::Knife, Card::Hall, None, None);
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
@@ -210,7 +223,7 @@ mod tests {
 
     #[test]
     fn test_possible_cards_1() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
 
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
@@ -226,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_possible_cards_2() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         assert_eq!(0, clue_engine.player_data[3].possible_cards.len());
 
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
@@ -244,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_all_cards_accounted_for() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(0, Card::ColonelMustard, true, true);
         clue_engine.learn_info_on_card(1, Card::MrGreen, true, true);
         clue_engine.learn_info_on_card(2, Card::MissScarlet, true, true);
@@ -256,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_single_card_accounted_for_not_solution() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(clue_engine.number_of_real_players(), Card::ColonelMustard, true, true);
 
         clue_engine.learn_info_on_card(0, Card::MrGreen, false, true);
@@ -270,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_number_card_limit() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
 
         clue_engine.learn_info_on_card(0, Card::MrGreen, true, true);
         clue_engine.learn_info_on_card(0, Card::Knife, true, true);
@@ -283,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_number_card_deduction() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
 
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Revolver, Card::Lounge, Some(2), None);
@@ -296,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_number_card_deduction_multiple() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
 
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Lounge, Some(2), None);
@@ -314,7 +327,7 @@ mod tests {
 
     #[test]
     fn test_eliminate_extra_clauses() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(2), None);
         clue_engine.learn_info_on_card(2, Card::Hall, false, true);
         assert_eq!(1, clue_engine.player_data[2].possible_cards.len());
@@ -328,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_shared_clause_1() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::Hall, false, true);
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(1), None);
         clue_engine.learn_suggest(2, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(3), None);
@@ -343,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_shared_clause_2() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::Hall, false, true);
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(1), None);
         clue_engine.learn_info_on_card(3, Card::Hall, false, true);
@@ -359,7 +372,7 @@ mod tests {
     #[test]
     #[ignore] // This test is slow
     fn test_simulation_known_person_has_card() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, true, true);
 
         let simulation_data = clue_engine.do_simulation();
@@ -375,7 +388,7 @@ mod tests {
     #[test]
     #[ignore] // This test is slow
     fn test_simulation_known_person_does_not_have_card() {
-        let mut clue_engine = ClueEngine::new(6);
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
 
         let simulation_data = clue_engine.do_simulation();

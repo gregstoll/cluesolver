@@ -234,14 +234,37 @@ pub struct ClueEngine {
 }
 
 impl ClueEngine {
-    pub fn new(number_of_players: u8) -> ClueEngine {
+    pub fn new(number_of_players: u8, number_of_cards_per_player: Option<&Vec<u8>>) -> Result<ClueEngine, String> {
+        let real_cards_per_player: &Vec<u8>;
+        let allocated_cards_per_player: Vec<u8>;
+        if let Some(vec) = number_of_cards_per_player {
+            real_cards_per_player = vec;
+        }
+        else {
+            allocated_cards_per_player = (0..number_of_players).map(|i| ClueEngine::number_of_player_cards(i, number_of_players)).collect();
+            real_cards_per_player = &allocated_cards_per_player;
+        }
+        if real_cards_per_player.len() != number_of_players as usize {
+            return Err(format!("Wrong number of cards in number_of_cards_per_player vector! (expected {}, got {})", number_of_players, real_cards_per_player.len()));
+        }
+        // There are CARD_LAST - 3 (actually 18) cards among the players.
+        if real_cards_per_player.iter().sum::<u8>() != CARD_LAST as u8 - 3 {
+            return Err(format!("Wrong total number of cards in number_of_cards_per_player! (expected {}, got {})", CARD_LAST - 3, real_cards_per_player.iter().sum::<u8>()));
+
+        }
         let mut player_datas: Vec<PlayerData> = vec!();
         for i in 0..(number_of_players + 1) {
-            let player_data = PlayerData::new(Some(ClueEngine::number_of_player_cards(i, number_of_players)), i == number_of_players);
+            let number_of_cards;
+            if i == number_of_players {
+                number_of_cards = 3 as u8;
+            }
+            else {
+                number_of_cards = real_cards_per_player[i as usize];
+            }
+            let player_data = PlayerData::new(Some(number_of_cards), i == number_of_players);
             player_datas.push(player_data);
         }
-        let clue_engine = ClueEngine { player_data: player_datas };
-        return clue_engine;
+        Ok(ClueEngine { player_data: player_datas })
     }
 
     pub fn number_of_real_players(self: &Self) -> usize {
@@ -264,8 +287,9 @@ impl ClueEngine {
             return 3
         }
         // There are 18 cards among the players.
-        let mut num_cards = 18 / num_players; // Integer division
-        let leftovers = 18 % num_players;
+        // There are CARD_LAST - 3 (actually 18) cards among the players.
+        let mut num_cards = (CARD_LAST - 3) as u8 / num_players; // Integer division
+        let leftovers = (CARD_LAST - 3) as u8 % num_players;
         // Assume the earlier players get the extra cards
         if player_index < leftovers {
             num_cards += 1;
@@ -285,7 +309,8 @@ impl ClueEngine {
     pub fn load_from_string(s: &str) -> Result<ClueEngine,()> {
         let mut tokenizer = Tokenizer::new(s);
         let number_of_players = tokenizer.next_digit()?;
-        let mut clue_engine = ClueEngine::new(number_of_players);
+        // This can't fail because we're not specifying the number of cards, so they'll get set correctly.
+        let mut clue_engine = ClueEngine::new(number_of_players, None).unwrap();
         for i in 0..(number_of_players+1) {
             clue_engine.load_player_from_string(i as usize, &mut tokenizer)?;
         }
