@@ -45,12 +45,12 @@ pub struct CardUtils {
 }
 
 impl CardUtils {
-    fn card_from_char(ch: char) -> Result<Card, ()> {
+    fn card_from_char(ch: char) -> Result<Card, String> {
         let index = ch as i32 - 'A' as i32;
         if index < 0 || index >= CARD_LAST {
-            return Err(());
+            return Err(format!("Invalid card character '{}'", ch));
         }
-        return FromPrimitive::from_i32(index).ok_or(());
+        return FromPrimitive::from_i32(index).ok_or(format!("Invalid card character '{}'", ch));
     }
 
     fn char_from_card(card: Card) -> char {
@@ -132,6 +132,11 @@ impl<'a> Tokenizer<'a> {
 
     pub fn next_digit(&mut self) -> Result<u8, ()> {
         return Ok(self.next().ok_or(())?.to_digit(10).ok_or(())? as u8);
+    }
+
+    // Returns the remainder of the input starting at the index.
+    pub fn as_str(&self) -> &str {
+        &self.input[self.index..]
     }
 
     /// Returns the next character without advancing
@@ -306,9 +311,9 @@ impl ClueEngine {
         return s;
     }
 
-    pub fn load_from_string(s: &str) -> Result<ClueEngine,()> {
+    pub fn load_from_string(s: &str) -> Result<ClueEngine, String> {
         let mut tokenizer = Tokenizer::new(s);
-        let number_of_players = tokenizer.next_digit()?;
+        let number_of_players = tokenizer.next_digit().map_err(|_| String::from("Error - couldn't parse number of players!"))?;
         // This can't fail because we're not specifying the number of cards, so they'll get set correctly.
         let mut clue_engine = ClueEngine::new(number_of_players, None).unwrap();
         for i in 0..(number_of_players+1) {
@@ -319,7 +324,7 @@ impl ClueEngine {
             return Ok(clue_engine);
         }
         else {
-            return Err(());
+            return Err(format!("Didn't use all of string; the part that was left is \"{}\"", tokenizer.as_str()));
         }
     }
 
@@ -332,32 +337,33 @@ impl ClueEngine {
     // one letter per card in possible_clauses
     //  (each possible_clause is separated by '-')
     // '.'
-    fn load_player_from_string(self: &mut ClueEngine, player_index: usize, tokenizer: &mut Tokenizer) -> Result<(), ()> {
+    fn load_player_from_string(self: &mut ClueEngine, player_index: usize, tokenizer: &mut Tokenizer) -> Result<(), String> {
+        const STRING_ENDED_ERROR: &str = "string ended unexpectedly!";
         {
-            let num_cards = tokenizer.next_digit()?;
+            let num_cards = tokenizer.next_digit().map_err(|_| String::from(STRING_ENDED_ERROR))?;
             (&mut self.player_data[player_index]).num_cards = if num_cards == 0 { None } else { Some(num_cards)};
         }
         // Load the list of cards this player has
-        while *tokenizer.peek().ok_or(())? != '-' {
-            self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().ok_or(())?)?, true, true);
+        while *tokenizer.peek().ok_or_else(|| String::from(STRING_ENDED_ERROR))? != '-' {
+            self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().ok_or(String::from(STRING_ENDED_ERROR))?)?, true, true);
         }
         // advance past the '-'
         tokenizer.next();
         // Load the list of cards this player doesn't have
         {
-            let mut next_char = *tokenizer.peek().ok_or(())?;
+            let mut next_char = *tokenizer.peek().ok_or(String::from(STRING_ENDED_ERROR))?;
             while next_char != '-' && next_char != '.' {
-                self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().ok_or(())?)?, false, true);
-                next_char = *tokenizer.peek().ok_or(())?;
+                self.learn_info_on_card(player_index, CardUtils::card_from_char(tokenizer.next().ok_or(String::from(STRING_ENDED_ERROR))?)?, false, true);
+                next_char = *tokenizer.peek().ok_or(String::from(STRING_ENDED_ERROR))?;
             }
         }
         // Load the list of clauses as long as it's not done
-        while tokenizer.next().ok_or(())? != '.' {
+        while tokenizer.next().ok_or(String::from(STRING_ENDED_ERROR))? != '.' {
             let mut clause = HashSet::new();
-            let mut next_char = *tokenizer.peek().ok_or(())?;
+            let mut next_char = *tokenizer.peek().ok_or(String::from(STRING_ENDED_ERROR))?;
             while next_char != '-' && next_char != '.' {
-                clause.insert(CardUtils::card_from_char(tokenizer.next().ok_or(())?)?);
-                next_char = *tokenizer.peek().ok_or(())?;
+                clause.insert(CardUtils::card_from_char(tokenizer.next().ok_or(String::from(STRING_ENDED_ERROR))?)?);
+                next_char = *tokenizer.peek().ok_or(String::from(STRING_ENDED_ERROR))?;
             }
             if !clause.is_empty() {
                 self.learn_has_one_of_cards(player_index, &clause);
