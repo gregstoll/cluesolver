@@ -1,5 +1,4 @@
-use std::time::Instant;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use clueengine::ClueEngine;
 
 /*fn main() {
@@ -18,7 +17,7 @@ use clueengine::ClueEngine;
 
 fn simulate_single() {
     let clue_engine = ClueEngine::load_from_string("63A-.3-A.3-A.3-A.3-A.3-A.3-A.").unwrap();
-    let simulation_data = clue_engine.do_simulation();
+    clue_engine.do_simulation();
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
