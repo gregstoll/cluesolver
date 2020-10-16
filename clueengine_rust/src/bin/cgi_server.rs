@@ -25,11 +25,10 @@ fn process_request(request: &cgi::Request) -> Result<json::JsonValue, String> {
     if action != "new" && !query_parts.contains_key("sess") {
         return Err(String::from("Internal error - missing sess!"));
     }
-    let mut engine: clueengine::ClueEngine;
     if action == "new" {
         let players_str = query_parts.get("players").ok_or(String::from("Internal error - action new without players!"))?;
         let num_players = players_str.parse::<u8>()
-            .map_err(|x| format!("Internal error - couldn't parse players string to u8: {}", players_str))?;
+            .map_err(|_| format!("Internal error - couldn't parse players string to u8: {}", players_str))?;
         let mut number_of_cards: Vec<u8> = vec!();
         for i in 0..num_players {
             let key = format!("numCards{}", i);
@@ -39,14 +38,14 @@ fn process_request(request: &cgi::Request) -> Result<json::JsonValue, String> {
                 .map_err(|_| format!("Internal error - action new can't parse numCards{} value \"{}\"!", i, number_of_cards_str))?;
             number_of_cards.push(real_number);
         }
-        engine = clueengine::ClueEngine::new(num_players, Some(&number_of_cards))?;
+        let engine = clueengine::ClueEngine::new(num_players, Some(&number_of_cards))?;
+        return Ok(json::object! {"session": engine.write_to_string()});
     }
-    else {
-        engine = clueengine::ClueEngine::load_from_string(query_parts.get("sess").unwrap())
-            .map_err(|x|format!("Internal error - invalid session string '{}': error \"{}\"", query_parts.get("sess").unwrap(), x))?;
-    }
-    //TODO
-    return Ok(json::object!{debug: format!("action is {}", query_parts.get("action").unwrap())});
+
+    let mut engine = clueengine::ClueEngine::load_from_string(query_parts.get("sess").unwrap())
+        .map_err(|x|format!("Internal error - invalid session string '{}': error \"{}\"", query_parts.get("sess").unwrap(), x))?;
+    // TODO
+    return Ok(json::object! {"debug": format!("action is {}", query_parts.get("action").unwrap())});
 }
 
 cgi::cgi_main! { |request: cgi::Request| {
