@@ -14,12 +14,7 @@ fn success(s: &json::JsonValue) -> cgi::Response {
 }
 
 fn process_request(request: &cgi::Request) -> Result<json::JsonValue, String> {
-    let possible_query = request.uri().query();
-    if possible_query == None {
-        // TODO - use try_cgi_main! which returns a Result<> instead?
-        return Err(String::from("No query string?"));
-    }
-    let query = possible_query.unwrap();
+    let query = request.uri().query().ok_or(String::from("Internal error - no query string?"))?;
     let query_parts: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes()).into_owned().collect();
     let action = query_parts.get("action").ok_or(String::from("Internal error - no action specified!"))?;
     // Valid actions are 'new', 'whoOwns', 'suggestion', 'fullInfo', 'simulate' ('accusation' in the future?)
