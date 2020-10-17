@@ -49,17 +49,14 @@ fn process_request(request: &cgi::Request) -> Result<json::JsonValue, String> {
         let owner_str = query_parts.get("owner").ok_or(String::from("Internal error - missing owner!"))?;
         let owner = owner_str.parse::<u8>().map_err(|_| String::from("Internal error - bad owner!"))?;
         let card_str = query_parts.get("card").ok_or(String::from("Internal error - missing card!"))?;
-        if card_str.len() != 1 {
-            return Err(format!("Invalid card \"{}\"!", card_str));
-        }
-        let ch = card_str.chars().next().ok_or(format!("Invalid card char \"{}\"!", card_str))?;
-        let card = clueengine::CardUtils::card_from_char(ch)?;
+        let card = card_from_string(card_str).map_err(|_| format!("Internal error - invalid card \"{}\"", card_str))?;
         let changed_cards = engine.learn_info_on_card(owner as usize, card, true, true);
-        /*return Ok(json::object! {
-            "clauseInfo":
+        return Ok(json::object! {
+            "newInfo": get_info_from_changed_cards(&engine, &changed_cards),
+            "clauseInfo": get_clause_info(&engine),
             "session": engine.write_to_string(),
             "isConsistent": engine.is_consistent()
-        });*/
+        });
 
     }
     // TODO
@@ -75,6 +72,42 @@ fn get_clause_info(engine: &clueengine::ClueEngine) -> json::JsonValue {
         }
     }
     info
+}
+
+fn get_info_from_changed_cards(engine: &clueengine::ClueEngine, changed_cards: &clueengine::CardSet) -> json::JsonValue {
+    let mut info = json::array![];
+    for card in changed_cards.iter() {
+        let possible_owners = engine.who_has_card(*card);
+        let status = if possible_owners.len() == 1 {
+            if *possible_owners.iter().next().unwrap() == engine.number_of_real_players() {
+                2  // Solution
+            } else {
+                1
+            }
+        } else {
+            if possible_owners.contains(&engine.number_of_real_players()) {
+                0
+            } else {
+                1
+            }
+        };
+        info.push(json::object!{
+            "card": format!("{:?}", *card),
+            "status": status,
+            "owner": json::from(possible_owners.iter().map(|x| *x).collect::<Vec<usize>>())
+        }).unwrap();
+    }
+    info
+}
+
+fn card_from_string(s: &str) -> Result<clueengine::Card, ()> {
+    // This is inefficient, but oh well
+    for card in clueengine::CardUtils::all_cards() {
+        if format!("{:?}", card) == s {
+            return Ok(card);
+        }
+    }
+    Err(())
 }
 
 cgi::cgi_main! { |request: cgi::Request| {
