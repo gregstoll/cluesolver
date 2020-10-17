@@ -45,7 +45,7 @@ pub struct CardUtils {
 }
 
 impl CardUtils {
-    fn card_from_char(ch: char) -> Result<Card, String> {
+    pub fn card_from_char(ch: char) -> Result<Card, String> {
         let index = ch as i32 - 'A' as i32;
         if index < 0 || index >= CARD_LAST {
             return Err(format!("Invalid card character '{}'", ch));
@@ -53,7 +53,7 @@ impl CardUtils {
         return FromPrimitive::from_i32(index).ok_or(format!("Invalid card character '{}'", ch));
     }
 
-    fn char_from_card(card: Card) -> char {
+    pub fn char_from_card(card: Card) -> char {
         let index = card as u8 + 'A' as u8;
         return index as char;
     }
@@ -379,7 +379,7 @@ impl ClueEngine {
         return changed_cards;
     }
 
-    pub fn learn_info_on_card_internal(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool, changed_cards: &mut CardSet) {
+    fn learn_info_on_card_internal(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool, changed_cards: &mut CardSet) {
         {
             let player = &mut self.player_data[player_index];
             if has_card {

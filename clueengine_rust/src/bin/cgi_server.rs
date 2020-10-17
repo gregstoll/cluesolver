@@ -44,8 +44,37 @@ fn process_request(request: &cgi::Request) -> Result<json::JsonValue, String> {
 
     let mut engine = clueengine::ClueEngine::load_from_string(query_parts.get("sess").unwrap())
         .map_err(|x|format!("Internal error - invalid session string '{}': error \"{}\"", query_parts.get("sess").unwrap(), x))?;
+
+    if action == "whoOwns" {
+        let owner_str = query_parts.get("owner").ok_or(String::from("Internal error - missing owner!"))?;
+        let owner = owner_str.parse::<u8>().map_err(|_| String::from("Internal error - bad owner!"))?;
+        let card_str = query_parts.get("card").ok_or(String::from("Internal error - missing card!"))?;
+        if card_str.len() != 1 {
+            return Err(format!("Invalid card \"{}\"!", card_str));
+        }
+        let ch = card_str.chars().next().ok_or(format!("Invalid card char \"{}\"!", card_str))?;
+        let card = clueengine::CardUtils::card_from_char(ch)?;
+        let changed_cards = engine.learn_info_on_card(owner as usize, card, true, true);
+        /*return Ok(json::object! {
+            "clauseInfo":
+            "session": engine.write_to_string(),
+            "isConsistent": engine.is_consistent()
+        });*/
+
+    }
     // TODO
     return Ok(json::object! {"debug": format!("action is {}", query_parts.get("action").unwrap())});
+}
+
+fn get_clause_info(engine: &clueengine::ClueEngine) -> json::JsonValue {
+    let mut info = json::object!{};
+    for i in 0..engine.player_data.len() {
+        //let mut cur_info = vec![];
+        for clause in engine.player_data[i].possible_cards.iter() {
+            //TODO
+        }
+    }
+    info
 }
 
 cgi::cgi_main! { |request: cgi::Request| {
