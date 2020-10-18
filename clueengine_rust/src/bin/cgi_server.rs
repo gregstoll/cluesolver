@@ -55,8 +55,7 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
         if owner as usize >= engine.player_data.len() {
             return Err(String::from("Internal error - owner out of range!"));
         }
-        let card_str = query_parts.get("card").ok_or(String::from("Internal error - missing card!"))?;
-        let card = card_from_string(card_str).map_err(|_| format!("Internal error - invalid card \"{}\"", card_str))?;
+        let card = card_from_query_parts(&query_parts, "card")?;
         let changed_cards = engine.learn_info_on_card(owner as usize, card, true, true);
         return Ok(json::object! {
             "newInfo": get_info_from_changed_cards(&engine, &changed_cards),
@@ -64,7 +63,31 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
             "session": engine.write_to_string(),
             "isConsistent": engine.is_consistent()
         });
-
+    }
+    if action == "suggestion" {
+        let suggesting_player_str = query_parts.get("suggestingPlayer").ok_or("Internal error - no suggestingPlayer")?;
+        let suggesting_player = suggesting_player_str.parse::<u8>().map_err(|_| String::from("Internal error - suggestingPlayer can't parse"))?;
+        if suggesting_player as usize >= engine.number_of_real_players() {
+            return Err(String::from("Internal error - suggesting_player out of range!"));
+        }
+        let card1 = card_from_query_parts(&query_parts, "card1")?;
+        let card2 = card_from_query_parts(&query_parts, "card2")?;
+        let card3 = card_from_query_parts(&query_parts, "card3")?;
+        let refuting_player_str = query_parts.get("refutingPlayer").ok_or("Internal error - no refutingPlayer")?;
+        let refuting_player_number = refuting_player_str.parse::<i16>().map_err(|_| format!("Internal error - couldn't parse refutingPlayer \"{}\"", refuting_player_str))?;
+        // TODO - what happens if this is negative and not -1?
+        let refuting_player = if refuting_player_number == -1 { None } else { Some(refuting_player_number as usize)};
+        if suggesting_player as usize >= engine.number_of_real_players() {
+            return Err(String::from("Internal error - suggesting_player out of range!"));
+        }
+        let refuting_card = optional_card_from_query_parts(&query_parts, "refutingCard")?;
+        let changed_cards = engine.learn_suggest(suggesting_player as usize, card1, card2, card3, refuting_player, refuting_card);
+        return Ok(json::object! {
+            "newInfo": get_info_from_changed_cards(&engine, &changed_cards),
+            "clauseInfo": get_clause_info(&engine),
+            "session": engine.write_to_string(),
+            "isConsistent": engine.is_consistent()
+        });
     }
     // TODO
     return Ok(json::object! {"debug": format!("action is {}", query_parts.get("action").unwrap())});
@@ -112,6 +135,18 @@ fn get_info_from_changed_cards(engine: &clueengine::ClueEngine, changed_cards: &
     info
 }
 
+fn card_from_query_parts(query_parts: &HashMap<String, String>, key: &str) -> Result<clueengine::Card, String> {
+    let card_str = query_parts.get("card").ok_or(format!("Internal error - missing card with key {}!", key))?;
+    return card_from_string(card_str).map_err(|_| format!("Internal error - bad card string {} for key {}", card_str, key));
+}
+
+fn optional_card_from_query_parts(query_parts: &HashMap<String, String>, key: &str) -> Result<Option<clueengine::Card>, String> {
+    let card_str = query_parts.get("card").ok_or(format!("Internal error - missing card with key {}!", key))?;
+    if card_str == "None" {
+        return Ok(None);
+    }
+    return card_from_string(card_str).map(|card| Some(card)).map_err(|_| format!("Internal error - bad card string {} for key {}", card_str, key));
+}
 fn card_from_string(s: &str) -> Result<clueengine::Card, ()> {
     // This is inefficient, but oh well
     for card in clueengine::CardUtils::all_cards() {
@@ -220,6 +255,7 @@ mod tests {
         assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
     }
 
+    // TODO - make a normalize() function that calls this and normalize_clause_info()
     // The order of this array doesn't matter, so sort them for testing purposes
     fn normalize_new_info(val: &mut json::JsonValue) {
         if val.has_key("newInfo") {
@@ -231,6 +267,14 @@ mod tests {
                 newNewInfo.push(value).unwrap();
             }
             val["newInfo"] = newNewInfo;
+        }
+    }
+
+    fn normalize_clause_info(val: &mut json::JsonValue) {
+        if val.has_key("clauseInfo") {
+            for (key, value) in val["clauseInfo"].entries() {
+                // TODO - finish this
+            }
         }
     }
 }
