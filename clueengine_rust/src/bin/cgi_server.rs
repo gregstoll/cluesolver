@@ -148,7 +148,6 @@ mod tests {
     #[test]
     fn test_new_cards_match() {
         let result = process_query_string("action=new&players=5&numCards0=4&numCards1=4&numCards2=4&numCards3=3&numCards4=3");
-        assert!(result.is_ok());
         let expected = json::parse("{\"session\": \"54-.4-.4-.3-.3-.3-.\"}").unwrap();
         assert_eq!(expected, result.unwrap());
     }
@@ -193,7 +192,6 @@ mod tests {
     #[test]
     fn test_whoOwns_playerOwns() {
         let result = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=0&card=ProfessorPlum");
-        assert!(result.is_ok());
         let expected = json::parse(r#"{"newInfo": [{"card": "ProfessorPlum", "status": 1, "owner": [0]}], "clauseInfo": {}, "session": "63A-.3-A.3-A.3-A.3-A.3-A.3-A.", "isConsistent": true}"#).unwrap();
         assert_eq!(expected, result.unwrap());
     }
@@ -201,21 +199,24 @@ mod tests {
     #[test]
     fn test_whoOwns_solutionOwns() {
         let result_wrapped = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=6&card=ProfessorPlum");
-        assert!(result_wrapped.is_ok());
         let mut result = result_wrapped.unwrap();
-
+        let mut expected = json::parse(r#"{"newInfo": [{"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}], "clauseInfo": {}, "session": "63-A.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
         normalize_new_info(&mut result);
-        let expected = json::parse(r#"{"newInfo": [{"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}], "clauseInfo": {}, "session": "63-A.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
+        normalize_new_info(&mut expected);
         assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
     }
 
+    // The order of this array doesn't matter, so sort them for testing purposes
     fn normalize_new_info(val: &mut json::JsonValue) {
         if val.has_key("newInfo") {
             let newInfo = &val["newInfo"];
-            let mut newNewInfo = json::object![];
-            //TODO - finish
-
-            //for newInfo.entries()
+            let mut newNewInfo = json::array![];
+            let mut values = newInfo.members().map(|x| x.clone()).collect::<Vec<json::JsonValue>>();
+            values.sort_by(|x, y| x["card"].as_str().unwrap().partial_cmp(y["card"].as_str().unwrap()).unwrap());
+            for value in values {
+                newNewInfo.push(value).unwrap();
+            }
+            val["newInfo"] = newNewInfo;
         }
     }
 }
