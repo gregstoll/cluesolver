@@ -240,8 +240,8 @@ mod tests {
         let result_wrapped = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=6&card=ProfessorPlum");
         let mut result = result_wrapped.unwrap();
         let mut expected = json::parse(r#"{"newInfo": [{"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}], "clauseInfo": {}, "session": "63-A.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
-        normalize_new_info(&mut result);
-        normalize_new_info(&mut expected);
+        normalize(&mut result);
+        normalize(&mut expected);
         assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
     }
 
@@ -250,12 +250,32 @@ mod tests {
         let result_wrapped = process_query_string("sess=63--ABC.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=6&card=ProfessorPlum");
         let mut result = result_wrapped.unwrap();
         let mut expected = json::parse(r#"{"newInfo": [{"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}], "clauseInfo": {"0": [["ColonelMustard", "MrGreen"]]}, "session": "63-A-BC.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
-        normalize_new_info(&mut result);
-        normalize_new_info(&mut expected);
+        normalize(&mut result);
+        normalize(&mut expected);
         assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
     }
 
-    // TODO - make a normalize() function that calls this and normalize_clause_info()
+    #[test]
+    fn test_normalize_new_info() {
+        let mut result = json::parse(r#"{"newInfo": [{"card": "z", "status": 0, "owner": [0]}, {"card": "a", "status": 1, "owner": [1]}]}"#).unwrap();
+        let expected= json::parse(r#"{"newInfo": [{"card": "a", "status": 1, "owner": [1]}, {"card": "z", "status": 0, "owner": [0]}]}"#).unwrap();
+        normalize_new_info(&mut result);
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_normalize_clause_info() {
+        let mut result = json::parse(r#"{"clauseInfo": {"0": [["a", "b"], ["y", "x"]], "1": [["d", "c"]]}}"#).unwrap();
+        let expected = json::parse(r#"{"clauseInfo": {"0": [["a", "b"], ["x", "y"]], "1": [["c", "d"]]}}"#).unwrap();
+        normalize_clause_info(&mut result);
+        assert_eq!(expected, result);
+    }
+
+    fn normalize(val: &mut json::JsonValue) {
+        normalize_new_info(val);
+        normalize_clause_info(val);
+    }
+
     // The order of this array doesn't matter, so sort them for testing purposes
     fn normalize_new_info(val: &mut json::JsonValue) {
         if val.has_key("newInfo") {
@@ -270,10 +290,21 @@ mod tests {
         }
     }
 
+    // The order of the clauses doesn't matter, so sort them for testing purposes
     fn normalize_clause_info(val: &mut json::JsonValue) {
         if val.has_key("clauseInfo") {
-            for (key, value) in val["clauseInfo"].entries() {
-                // TODO - finish this
+            let clause_info = &mut val["clauseInfo"];
+            // This is pretty ugly, got a little tired of fighting with the borrow checker
+            let cloned_clause_info = clause_info.clone();
+            let entries = cloned_clause_info.entries().collect::<Vec<(&str, &json::JsonValue)>>();
+            for (key, array_of_clauses) in entries {
+                let mut new_array_of_clauses = json::array![];
+                for clause in array_of_clauses.members() {
+                    let mut new_clause = clause.members().map(|x| x.clone()).collect::<Vec<json::JsonValue>>();
+                    new_clause.sort_by(|x, y| x.as_str().unwrap().partial_cmp(y.as_str().unwrap()).unwrap());
+                    new_array_of_clauses.push(new_clause).unwrap();
+                }
+                clause_info[key] = new_array_of_clauses;
             }
         }
     }
