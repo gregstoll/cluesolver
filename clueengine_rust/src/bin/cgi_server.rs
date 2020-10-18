@@ -71,11 +71,14 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
 }
 
 fn get_clause_info(engine: &clueengine::ClueEngine) -> json::JsonValue {
-    let mut info = json::object!{};
+    let mut info = json::JsonValue::new_object();
     for i in 0..engine.player_data.len() {
-        //let mut cur_info = vec![];
+        let mut cur_info = json::JsonValue::new_array();
         for clause in engine.player_data[i].possible_cards.iter() {
-            //TODO
+            cur_info.push(clause.iter().map(|x| format!("{:?}", *x)).collect::<Vec<String>>()).unwrap();
+        }
+        if cur_info.len() > 0 {
+            info[i.to_string()] = cur_info;
         }
     }
     info
@@ -193,6 +196,7 @@ mod tests {
     fn test_whoOwns_playerOwns() {
         let result = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=0&card=ProfessorPlum");
         let expected = json::parse(r#"{"newInfo": [{"card": "ProfessorPlum", "status": 1, "owner": [0]}], "clauseInfo": {}, "session": "63A-.3-A.3-A.3-A.3-A.3-A.3-A.", "isConsistent": true}"#).unwrap();
+
         assert_eq!(expected, result.unwrap());
     }
 
@@ -201,6 +205,16 @@ mod tests {
         let result_wrapped = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=6&card=ProfessorPlum");
         let mut result = result_wrapped.unwrap();
         let mut expected = json::parse(r#"{"newInfo": [{"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}], "clauseInfo": {}, "session": "63-A.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
+        normalize_new_info(&mut result);
+        normalize_new_info(&mut expected);
+        assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
+    }
+
+    #[test]
+    fn test_whoOwns_solutionOwns_with_clause_info() {
+        let result_wrapped = process_query_string("sess=63--ABC.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=6&card=ProfessorPlum");
+        let mut result = result_wrapped.unwrap();
+        let mut expected = json::parse(r#"{"newInfo": [{"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}], "clauseInfo": {"0": [["ColonelMustard", "MrGreen"]]}, "session": "63-A-BC.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
         normalize_new_info(&mut result);
         normalize_new_info(&mut expected);
         assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
