@@ -75,11 +75,10 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
         let card3 = card_from_query_parts(&query_parts, "card3")?;
         let refuting_player_str = query_parts.get("refutingPlayer").ok_or("Internal error - no refutingPlayer")?;
         let refuting_player_number = refuting_player_str.parse::<i16>().map_err(|_| format!("Internal error - couldn't parse refutingPlayer \"{}\"", refuting_player_str))?;
-        // TODO - what happens if this is negative and not -1?
-        let refuting_player = if refuting_player_number == -1 { None } else { Some(refuting_player_number as usize)};
-        if suggesting_player as usize >= engine.number_of_real_players() {
-            return Err(String::from("Internal error - suggesting_player out of range!"));
+        if refuting_player_number < -1 || refuting_player_number >= engine.number_of_real_players() as i16 {
+            return Err(String::from("Internal error - refuting player out of range!"));
         }
+        let refuting_player = if refuting_player_number == -1 { None } else { Some(refuting_player_number as usize)};
         let refuting_card = optional_card_from_query_parts(&query_parts, "refutingCard")?;
         let changed_cards = engine.learn_suggest(suggesting_player as usize, card1, card2, card3, refuting_player, refuting_card);
         return Ok(json::object! {
@@ -215,6 +214,12 @@ mod tests {
     }
 
     #[test]
+    fn test_whoOwns_owner_none_error() {
+        let result = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=None&card=ProfessorPlum");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_whoOwns_no_card_error() {
         let result = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=0");
         assert!(result.is_err());
@@ -223,6 +228,12 @@ mod tests {
     #[test]
     fn test_whoOwns_card_invalid_error() {
         let result = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=0&card=NotACard");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_whoOwns_card_none_error() {
+        let result = process_query_string("sess=63-.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=0&card=None");
         assert!(result.is_err());
     }
 
@@ -259,6 +270,108 @@ mod tests {
         assert_querystring_results_match(
             "action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None",
             r#"{"newInfo": [{"card": "ProfessorPlum", "status": 0, "owner": [1, 6]}, {"card": "Knife", "status": 0, "owner": [1, 6]}, {"card": "Hall", "status": 0, "owner": [1, 6]}], "clauseInfo": {}, "session": "63-AGM.3-.3-AGM.3-AGM.3-AGM.3-AGM.3-.", "isConsistent": true}"#);
+    }
+
+    #[test]
+    fn test_suggestion_suggestingPlayer_negative_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=-1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_suggestingPlayer_None_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=None&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_suggestingPlayer_missing_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card1_invalid_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=NotACard&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card1_none_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=None&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card1_missing_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card2_invalid_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=NotACard&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card2_none_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=None&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card2_missing_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card3_invalid_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=NotACard&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card3_none_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=None&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_card3_missing_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&refutingPlayer=-1&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_refutingPlayer_negative_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=-2&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_refutingPlayer_toobig_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=6&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_refutingPlayer_None_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=None&refutingCard=None");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_refutingCard_invalid_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=2&refutingCard=NotACard");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_suggestion_refutingCard_missing_error() {
+        let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=2");
+        assert!(result.is_err());
     }
 
     #[test]
