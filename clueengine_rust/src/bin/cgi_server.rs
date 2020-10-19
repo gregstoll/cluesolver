@@ -136,12 +136,12 @@ fn get_info_from_changed_cards(engine: &clueengine::ClueEngine, changed_cards: &
 }
 
 fn card_from_query_parts(query_parts: &HashMap<String, String>, key: &str) -> Result<clueengine::Card, String> {
-    let card_str = query_parts.get("card").ok_or(format!("Internal error - missing card with key {}!", key))?;
+    let card_str = query_parts.get(key).ok_or(format!("Internal error - missing card with key {}!", key))?;
     return card_from_string(card_str).map_err(|_| format!("Internal error - bad card string {} for key {}", card_str, key));
 }
 
 fn optional_card_from_query_parts(query_parts: &HashMap<String, String>, key: &str) -> Result<Option<clueengine::Card>, String> {
-    let card_str = query_parts.get("card").ok_or(format!("Internal error - missing card with key {}!", key))?;
+    let card_str = query_parts.get(key).ok_or(format!("Internal error - missing card with key {}!", key))?;
     if card_str == "None" {
         return Ok(None);
     }
@@ -250,6 +250,26 @@ mod tests {
         let result_wrapped = process_query_string("sess=63--ABC.3-.3-.3-.3-.3-.3-.&action=whoOwns&owner=6&card=ProfessorPlum");
         let mut result = result_wrapped.unwrap();
         let mut expected = json::parse(r#"{"newInfo": [{"card": "MrsPeacock", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ColonelMustard", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "MsWhite", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}, {"card": "ProfessorPlum", "status": 2, "owner": [6]}, {"card": "MrGreen", "status": 1, "owner": [0, 1, 2, 3, 4, 5]}], "clauseInfo": {"0": [["ColonelMustard", "MrGreen"]]}, "session": "63-A-BC.3-A.3-A.3-A.3-A.3-A.3A-BCDEF.", "isConsistent": true}"#).unwrap();
+        normalize(&mut result);
+        normalize(&mut expected);
+        assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
+    }
+
+    #[test]
+    fn test_suggestion_knownplayer_knowncard() {
+        let result_wrapped = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=4&refutingCard=Knife");
+        let mut result = result_wrapped.unwrap();
+        let mut expected = json::parse(r#"{"newInfo": [{"card": "Hall", "status": 0, "owner": [0, 1, 4, 5, 6]}, {"card": "Knife", "status": 1, "owner": [4]}, {"card": "ProfessorPlum", "status": 0, "owner": [0, 1, 4, 5, 6]}], "clauseInfo": {}, "session": "63-G.3-G.3-AGM.3-AGM.3G-.3-G.3-G.", "isConsistent": true}"#).unwrap();
+        normalize(&mut result);
+        normalize(&mut expected);
+        assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
+    }
+
+    #[test]
+    fn test_suggestion_notrefuted() {
+        let result_wrapped = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=-1&refutingCard=None");
+        let mut result = result_wrapped.unwrap();
+        let mut expected = json::parse(r#"{"newInfo": [{"card": "ProfessorPlum", "status": 0, "owner": [1, 6]}, {"card": "Knife", "status": 0, "owner": [1, 6]}, {"card": "Hall", "status": 0, "owner": [1, 6]}], "clauseInfo": {}, "session": "63-AGM.3-.3-AGM.3-AGM.3-AGM.3-AGM.3-.", "isConsistent": true}"#).unwrap();
         normalize(&mut result);
         normalize(&mut expected);
         assert_eq!(expected, result.clone(), "got {}", json::stringify(result));
