@@ -1,7 +1,8 @@
 extern crate cgi;
 extern crate json;
 extern crate url;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
 
 fn error(s: &str) -> cgi::Response {
     cgi::binary_response(200, "application/json", (json::object!{"errorStatus": 1, "errorText": s.clone()}).dump().as_bytes().to_vec())
@@ -85,6 +86,19 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
             "newInfo": get_info_from_changed_cards(&engine, &changed_cards),
             "clauseInfo": get_clause_info(&engine),
             "session": engine.write_to_string(),
+            "isConsistent": engine.is_consistent()
+        });
+    }
+    if action == "fullInfo" {
+        let all_cards = HashSet::from_iter(clueengine::CardUtils::all_cards());
+        //TODO
+        //let number_of_cards = engine.player_data.iter().map
+        return Ok(json::object! {
+            "newInfo": get_info_from_changed_cards(&engine, &all_cards),
+            "clauseInfo": get_clause_info(&engine),
+            "session": engine.write_to_string(),
+            "numPlayers": engine.number_of_real_players(),
+            "numCards": [], // TODO
             "isConsistent": engine.is_consistent()
         });
     }
