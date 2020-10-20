@@ -91,14 +91,15 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
     }
     if action == "fullInfo" {
         let all_cards = HashSet::from_iter(clueengine::CardUtils::all_cards());
-        //TODO
-        //let number_of_cards = engine.player_data.iter().map
+        let mut number_of_cards = engine.player_data.iter().map(|x| x.num_cards.unwrap() as usize).collect::<Vec<usize>>();
+        // Don't return number_of_cards for solution
+        number_of_cards.remove(number_of_cards.len() - 1);
         return Ok(json::object! {
             "newInfo": get_info_from_changed_cards(&engine, &all_cards),
             "clauseInfo": get_clause_info(&engine),
             "session": engine.write_to_string(),
             "numPlayers": engine.number_of_real_players(),
-            "numCards": [], // TODO
+            "numCards": number_of_cards,
             "isConsistent": engine.is_consistent()
         });
     }
@@ -385,6 +386,33 @@ mod tests {
     #[test]
     fn test_suggestion_refutingCard_missing_error() {
         let result = process_query_string("action=suggestion&sess=63-.3-.3-.3-.3-.3-.3-.&suggestingPlayer=1&card1=ProfessorPlum&card2=Knife&card3=Hall&refutingPlayer=2");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_fullInfo_empty_game() {
+        assert_querystring_results_match(
+            "action=fullInfo&sess=63-.3-.3-.3-.3-.3-.3-.",
+            r#"{"newInfo": [{"card": "ProfessorPlum", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "ColonelMustard", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "MrGreen", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "MissScarlet", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "MsWhite", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "MrsPeacock", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Knife", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Candlestick", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Revolver", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "LeadPipe", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Rope", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Wrench", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Hall", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Conservatory", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "DiningRoom", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Kitchen", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Study", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Library", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Ballroom", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "Lounge", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}, {"card": "BilliardRoom", "status": 0, "owner": [0, 1, 2, 3, 4, 5, 6]}], "clauseInfo": {}, "session": "63-.3-.3-.3-.3-.3-.3-.", "numPlayers": 6, "numCards": [3, 3, 3, 3, 3, 3], "isConsistent": true}"#);
+    }
+
+    #[test]
+    fn test_fullInfo_complicated_game() {
+        assert_querystring_results_match(
+            "action=fullInfo&sess=63-QLU.3-ANQIHOLUMG.3-QLU-AMG-ANH-AOI.3QLU-AFECSNBTIHKOGRPMJD.3-QLU.3-QLU.3-QLU.",
+            r#"{"newInfo": [{"card": "ProfessorPlum", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "ColonelMustard", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "MrGreen", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "MissScarlet", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "MsWhite", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "MrsPeacock", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "Knife", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "Candlestick", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "Revolver", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "LeadPipe", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "Rope", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "Wrench", "status": 1, "owner": [3]}, {"card": "Hall", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "Conservatory", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "DiningRoom", "status": 0, "owner": [0, 2, 4, 5, 6]}, {"card": "Kitchen", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "Study", "status": 1, "owner": [3]}, {"card": "Library", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "Ballroom", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "Lounge", "status": 0, "owner": [0, 1, 2, 4, 5, 6]}, {"card": "BilliardRoom", "status": 1, "owner": [3]}], "clauseInfo": {"2": [["Knife", "Hall", "ProfessorPlum"], ["Conservatory", "Candlestick", "ProfessorPlum"], ["DiningRoom", "Revolver", "ProfessorPlum"]]}, "session": "63-LQU.3-AGHILMNOQU.3-LQU-AGM-AHN-AIO.3LQU-ABCDEFGHIJKMNOPRST.3-LQU.3-LQU.3-LQU.", "numPlayers": 6, "numCards": [3, 3, 3, 3, 3, 3], "isConsistent": true}"#);
+    }
+
+    #[test]
+    fn test_fullInfo_complicated_game2() {
+        assert_querystring_results_match(
+            "action=fullInfo&sess=54TNJS-AFECBIHKOLURQPMGD.4-ANSTOJ-FHP.4-ANSTOKJP.3-FNSHTJP-AO-AK.3-FNSHTJP.3-TNJS.",
+            r#"{"newInfo": [{"card": "ProfessorPlum", "status": 0, "owner": [3, 4, 5]}, {"card": "ColonelMustard", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "MrGreen", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "MissScarlet", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "MsWhite", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "MrsPeacock", "status": 0, "owner": [1, 2, 5]}, {"card": "Knife", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "Candlestick", "status": 0, "owner": [1, 2, 5]}, {"card": "Revolver", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "LeadPipe", "status": 1, "owner": [0]}, {"card": "Rope", "status": 0, "owner": [1, 3, 4, 5]}, {"card": "Wrench", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "Hall", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "Conservatory", "status": 1, "owner": [0]}, {"card": "DiningRoom", "status": 0, "owner": [3, 4, 5]}, {"card": "Kitchen", "status": 0, "owner": [1, 5]}, {"card": "Study", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "Library", "status": 0, "owner": [1, 2, 3, 4, 5]}, {"card": "Ballroom", "status": 1, "owner": [0]}, {"card": "Lounge", "status": 1, "owner": [0]}, {"card": "BilliardRoom", "status": 0, "owner": [1, 2, 3, 4, 5]}], "clauseInfo": {"1": [["MrsPeacock", "Kitchen", "Candlestick"]], "3": [["ProfessorPlum", "DiningRoom"], ["ProfessorPlum", "Rope"]]}, "session": "54JNST-ABCDEFGHIKLMOPQRU.4-AJNOST-FHP.4-AJKNOPST.3-FHJNPST-AO-AK.3-FHJNPST.3-JNST.", "numPlayers": 5, "numCards": [4, 4, 4, 3, 3], "isConsistent": true}"#);
+    }
+
+    #[test]
+    fn test_fullInfo_sess_missing_error() {
+        let result = process_query_string("action=fullInfo");
         assert!(result.is_err());
     }
 
