@@ -23,7 +23,6 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
     let query_parts: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes()).into_owned().collect();
     let action = query_parts.get("action").ok_or(String::from("Internal error - no action specified!"))?;
     // Valid actions are 'new', 'whoOwns', 'suggestion', 'fullInfo', 'simulate' ('accusation' in the future?)
-    // TODO - make this an enum or something
     if action != "new" && action != "whoOwns" && action != "suggestion" && action != "fullInfo" && action != "simulate" {
         return Err(format!("Internal error - invalid action \"{}\"!", action));
     }
@@ -103,8 +102,13 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
             "isConsistent": engine.is_consistent()
         });
     }
-    // TODO
-    return Ok(json::object! {"debug": format!("action is {}", query_parts.get("action").unwrap())});
+    if action == "simulate" {
+        let simulation_data = engine.do_simulation();
+        return Ok(json::object! {
+            "simData": format_simulation_data(&simulation_data)
+        });
+    }
+    return Err(format!("Internal error - unexpected action \"{}\"", action));
 }
 
 fn get_clause_info(engine: &clueengine::ClueEngine) -> json::JsonValue {
@@ -112,7 +116,7 @@ fn get_clause_info(engine: &clueengine::ClueEngine) -> json::JsonValue {
     for i in 0..engine.player_data.len() {
         let mut cur_info = json::JsonValue::new_array();
         for clause in engine.player_data[i].possible_cards.iter() {
-            cur_info.push(clause.iter().map(|x| format!("{:?}", *x)).collect::<Vec<String>>()).unwrap();
+            cur_info.push(clause.iter().map(|x| card_to_string(*x)).collect::<Vec<String>>()).unwrap();
         }
         if cur_info.len() > 0 {
             info[i.to_string()] = cur_info;
@@ -141,12 +145,20 @@ fn get_info_from_changed_cards(engine: &clueengine::ClueEngine, changed_cards: &
         let mut owners_sorted = possible_owners.iter().map(|x| *x).collect::<Vec<usize>>();
         owners_sorted.sort();
         info.push(json::object!{
-            "card": format!("{:?}", *card),
+            "card": card_to_string(*card),
             "status": status,
             "owner": json::from(owners_sorted)
         }).unwrap();
     }
     info
+}
+
+fn format_simulation_data(simulation_data: &HashMap<clueengine::Card, Vec<usize>>) -> json::JsonValue {
+    let mut data = json::object![];
+    for (card, vals) in simulation_data {
+        data[card_to_string(*card)] = json::JsonValue::from(vals.clone());
+    }
+    return data;
 }
 
 fn card_from_query_parts(query_parts: &HashMap<String, String>, key: &str) -> Result<clueengine::Card, String> {
@@ -164,11 +176,14 @@ fn optional_card_from_query_parts(query_parts: &HashMap<String, String>, key: &s
 fn card_from_string(s: &str) -> Result<clueengine::Card, ()> {
     // This is inefficient, but oh well
     for card in clueengine::CardUtils::all_cards() {
-        if format!("{:?}", card) == s {
+        if card_to_string(card) == s {
             return Ok(card);
         }
     }
     Err(())
+}
+fn card_to_string(card: clueengine::Card) -> String {
+    format!("{:?}", card)
 }
 
 cgi::cgi_main! { |request: cgi::Request| {
@@ -413,6 +428,27 @@ mod tests {
     #[test]
     fn test_fullInfo_sess_missing_error() {
         let result = process_query_string("action=fullInfo");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulate_complicated_game() {
+        let result = process_query_string("action=simulate&sess=54TNJS-AFECBIHKOLURQPMGD.4-ANSTOJ-FHP.4-ANSTOKJP.3-FNSHTJP-AO-AK.3-FNSHTJP.3-TNJS.").unwrap();
+        // Just spot check a few things
+        assert_eq!(0, result["simData"]["ProfessorPlum"][0]);
+        assert_eq!(0, result["simData"]["ProfessorPlum"][1]);
+        assert_eq!(0, result["simData"]["ProfessorPlum"][2]);
+        assert_eq!(0, result["simData"]["ColonelMustard"][0]);
+        for i in 1..6 {
+            assert_eq!(0, result["simData"]["Ballroom"][i]);
+        }
+        assert!(result["simData"]["Ballroom"][0].as_i32().unwrap() > 900);
+    }
+
+    #[test]
+    fn test_simulate_sess_missing_error() {
+        let result = process_query_string("action=simulate");
         assert!(result.is_err());
     }
 
