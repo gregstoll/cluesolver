@@ -1,1 +1,1 @@
-../clue.py
+../clueengine_rust/target/release/cgi_server
