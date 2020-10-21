@@ -794,26 +794,50 @@ impl ClueEngine {
 
     // Returns whether the simulation is consistent
     fn do_one_simulation(engine: &mut ClueEngine, available_cards: &CardSet) -> bool {
-        let mut temp_available_cards = available_cards.iter().collect::<Vec<&Card>>();
-        // Assign all values randomly.
-        for player_index in 0..engine.number_of_real_players() {
-            let player = &engine.player_data[player_index];
-            let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
-            //TODO - we could put this check back in
-            //let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
-            // If there are not enough cards available, we're
-            // inconsistent.
-            if temp_available_cards.len() < num_cards_needed {
-                return false;
-            }
-            else {
-                for _ in 0..num_cards_needed {
-                    let index = (rand::random::<f32>() * temp_available_cards.len() as f32).floor() as usize;
-                    let card_to_add = temp_available_cards.remove(index);
-                    //temp_available_cards.remove(&card_to_add);
-                    engine.learn_info_on_card(player_index, *card_to_add, true, true);
+        const USE_UNBIASED_ALGORITHM: bool = true;
+        if USE_UNBIASED_ALGORITHM {
+            let mut temp_available_cards = available_cards.iter().collect::<Vec<&Card>>();
+            // Assign all values randomly.
+            for player_index in 0..engine.number_of_real_players() {
+                let player = &engine.player_data[player_index];
+                let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
+                //TODO - we could put this check back in
+                //let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+                // If there are not enough cards available, we're
+                // inconsistent.
+                if temp_available_cards.len() < num_cards_needed {
+                    return false;
+                }
+                else {
+                    for _ in 0..num_cards_needed {
+                        let index = (rand::random::<f32>() * temp_available_cards.len() as f32).floor() as usize;
+                        let card_to_add = temp_available_cards.remove(index);
+                        engine.learn_info_on_card(player_index, *card_to_add, true, true);
+                    }
                 }
             }
+        }
+        else {
+            let mut temp_available_cards = available_cards.clone();
+            for player_index in 0..engine.number_of_real_players() {
+                let player = &engine.player_data[player_index];
+                let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
+                let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+                // If there are not enough cards available, we're
+                // inconsistent.
+                if player_cards_available.len() < num_cards_needed {
+                    return false;
+                }
+                else {
+                    for _ in 0..num_cards_needed {
+                        let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
+                        let card_to_add = player_cards_available.remove(index);
+                        temp_available_cards.remove(&card_to_add);
+                        engine.learn_info_on_card(player_index, card_to_add, true, true);
+                    }
+                }
+            }
+
         }
         // All players assigned.  Check consistency.
         let is_consistent = engine.player_data.iter().all(|player| {

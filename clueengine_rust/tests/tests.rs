@@ -404,7 +404,7 @@ mod tests {
     
     #[test]
     #[ignore] // This test is slow
-    fn test_simulation_trickycase1_hasresults() {
+    fn test_simulation_trickycase1_has_results() {
         let clue_engine = ClueEngine::load_from_string("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.").unwrap();
 
         let simulation_data = clue_engine.do_simulation();
@@ -445,5 +445,29 @@ mod tests {
         let max = *plum_data.iter().max().unwrap();
         assert!(max > 0);
         assert_eq!(max, plum_data[1]);
+    }
+
+    #[test]
+    #[ignore] // This test is slow
+    fn test_simulation_monty_hall() {
+        let mut clue_engine = ClueEngine::new(6, None).unwrap();
+        clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(5), None);
+
+        let simulation_data = clue_engine.do_simulation();
+
+        // In this game we know players 1-4 don't have ProfessorPlum.
+        // Player 5 should have a high chance of having it
+        // And it should be significantly more likely to be the solution
+        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let num_simulations = plum_data.iter().sum::<usize>();
+        let player0_plum = plum_data[0];
+        let player5_plum = plum_data[5];
+        let solution_plum = plum_data[6];
+        eprintln!("{:?}", plum_data);
+        assert!(player0_plum > 0);
+        assert!(player5_plum > 2 * player0_plum);
+        assert!(player5_plum as f32 > 0.3 * (num_simulations as f32));
+        assert!(solution_plum > 2 * player0_plum);
+        assert!(solution_plum as f32 > 0.3 * (num_simulations as f32));
     }
 }
