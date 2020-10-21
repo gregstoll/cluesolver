@@ -239,6 +239,8 @@ pub struct ClueEngine {
 }
 
 impl ClueEngine {
+    pub const NUM_SIMULATIONS: i32 = 20000;
+
     pub fn new(number_of_players: u8, number_of_cards_per_player: Option<&Vec<u8>>) -> Result<ClueEngine, String> {
         let real_cards_per_player: &Vec<u8>;
         let allocated_cards_per_player: Vec<u8>;
@@ -756,8 +758,8 @@ impl ClueEngine {
                 solution_possibilities.insert(*card_type, all_possible_cards.iter().filter_map(|&card| if not_solution_cards.contains(&card) {None } else {Some(card)}).collect());
             }
         }
-        let total_iterations = 2000;
-        let iterations_per_solution = total_iterations / solution_possibilities.values().map(|cards| cards.len()).fold(1, |x, y| x*y);
+        let number_of_solutions = solution_possibilities.values().map(|cards| cards.len() as i32).product::<i32>();
+        let iterations_per_solution = Self::NUM_SIMULATIONS / number_of_solutions;
         for card1 in solution_possibilities.get(&CardType::Suspect).unwrap() {
             for card2 in solution_possibilities.get(&CardType::Weapon).unwrap() {
                 for card3 in solution_possibilities.get(&CardType::Room).unwrap() {
@@ -792,23 +794,24 @@ impl ClueEngine {
 
     // Returns whether the simulation is consistent
     fn do_one_simulation(engine: &mut ClueEngine, available_cards: &CardSet) -> bool {
-        let mut temp_available_cards = available_cards.clone();
+        let mut temp_available_cards = available_cards.iter().collect::<Vec<&Card>>();
         // Assign all values randomly.
         for player_index in 0..engine.number_of_real_players() {
             let player = &engine.player_data[player_index];
             let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
-            let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+            //TODO - we could put this check back in
+            //let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
             // If there are not enough cards available, we're
             // inconsistent.
-            if player_cards_available.len() < num_cards_needed {
+            if temp_available_cards.len() < num_cards_needed {
                 return false;
             }
             else {
                 for _ in 0..num_cards_needed {
-                    let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
-                    let card_to_add = player_cards_available.remove(index);
-                    temp_available_cards.remove(&card_to_add);
-                    engine.learn_info_on_card(player_index, card_to_add, true, true);
+                    let index = (rand::random::<f32>() * temp_available_cards.len() as f32).floor() as usize;
+                    let card_to_add = temp_available_cards.remove(index);
+                    //temp_available_cards.remove(&card_to_add);
+                    engine.learn_info_on_card(player_index, *card_to_add, true, true);
                 }
             }
         }

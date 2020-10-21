@@ -409,9 +409,10 @@ mod tests {
 
         let simulation_data = clue_engine.do_simulation();
 
-        // no clauses here, so all simulations should succeed
+        //TODO - what to do about this
+        // no clauses here
         let solution_configurations = 2*4*6;
-        let expected_num_simulations = (2000 / solution_configurations) * solution_configurations;
+        let expected_num_simulations = (20000 / solution_configurations) * solution_configurations;
         for card in simulation_data.keys() {
             let number_of_simulations: usize = simulation_data.get(card).unwrap().iter().sum();
             assert_eq!(expected_num_simulations, number_of_simulations);
