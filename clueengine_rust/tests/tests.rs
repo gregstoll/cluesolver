@@ -466,6 +466,7 @@ mod tests {
         eprintln!("num_simulations: {:?}", num_simulations);
         eprintln!("Plum: {:?}", plum_data);
         eprintln!("Knife: {:?}", simulation_data.get(&Card::Knife).unwrap());
+        eprintln!("Mustard: {:?}", simulation_data.get(&Card::ColonelMustard).unwrap());
         assert!(player0_plum > 0);
         assert!(player5_plum as f32 > 0.3 * (num_simulations as f32));
         assert!(solution_plum as f32 > 0.2 * (num_simulations as f32));
@@ -490,6 +491,7 @@ mod tests {
         eprintln!("num_simulations: {:?}", num_simulations);
         eprintln!("Plum: {:?}", plum_data);
         eprintln!("Knife: {:?}", simulation_data.get(&Card::Knife).unwrap());
+        eprintln!("Mustard: {:?}", simulation_data.get(&Card::ColonelMustard).unwrap());
         assert!(player5_plum as f32 > 0.3 * (num_simulations as f32));
         assert!(solution_plum as f32 > 0.3 * (num_simulations as f32));
     }
