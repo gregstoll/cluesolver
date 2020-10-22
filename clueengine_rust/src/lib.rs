@@ -1,9 +1,12 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::{collections::HashSet, collections::HashMap, iter::Peekable, str::Chars};
+use std::cmp::min;
 use std::iter::FromIterator;
+use rayon::prelude::*;
 
 pub type CardSet = HashSet<Card>;
+pub type SimulationData = HashMap<Card, Vec<usize>>;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, FromPrimitive, Hash, Copy, Clone)]
 pub enum Card {
@@ -239,6 +242,8 @@ pub struct ClueEngine {
 }
 
 impl ClueEngine {
+    pub const NUM_SIMULATIONS: i32 = 20000;
+
     pub fn new(number_of_players: u8, number_of_cards_per_player: Option<&Vec<u8>>) -> Result<ClueEngine, String> {
         let real_cards_per_player: &Vec<u8>;
         let allocated_cards_per_player: Vec<u8>;
@@ -730,8 +735,10 @@ impl ClueEngine {
         }
     }
 
-    pub fn do_simulation(self: &Self) -> HashMap<Card, Vec<usize>> {
-        let mut simulation_data = HashMap::new();
+    pub fn do_simulation(self: &Self) -> SimulationData {
+        const SIMULATION_IN_PARALLEL: bool = true;
+        const NUM_SIMULATIONS_TO_SPLIT: i32 = 100;
+        let mut simulation_data = SimulationData::new();
         self.initialize_simulation_data(&mut simulation_data);
         if self.player_data.iter().any(|player| player.num_cards == None) {
             // Can't do simulations if we don't know how many cards everyone has
@@ -756,61 +763,131 @@ impl ClueEngine {
                 solution_possibilities.insert(*card_type, all_possible_cards.iter().filter_map(|&card| if not_solution_cards.contains(&card) {None } else {Some(card)}).collect());
             }
         }
-        let total_iterations = 2000;
-        let iterations_per_solution = total_iterations / solution_possibilities.values().map(|cards| cards.len()).fold(1, |x, y| x*y);
+        let number_of_solutions = solution_possibilities.values().map(|cards| cards.len() as i32).product::<i32>();
+        let iterations_per_solution = Self::NUM_SIMULATIONS / number_of_solutions;
+        let mut solution_engines: Vec<(ClueEngine, i32)> = vec![];
         for card1 in solution_possibilities.get(&CardType::Suspect).unwrap() {
             for card2 in solution_possibilities.get(&CardType::Weapon).unwrap() {
                 for card3 in solution_possibilities.get(&CardType::Room).unwrap() {
-                    let current_solution: [Card; 3] = [*card1, *card2, *card3];
+                    // Don't split on just cards, because of there are only a few solution possibilities
+                    // we won't get good parallelism.
                     let mut engine_copy = self.clone();
-                    for solution_card in current_solution.iter() {
-                        engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *solution_card, true, true);
-                    }
-                    // Find the available free cards.
-                    let mut available_cards: CardSet = CardUtils::all_cards().collect();
-                    for player in engine_copy.player_data.iter() {
-                        for has_card in player.has_cards.iter() {
-                            available_cards.remove(has_card);
+                    engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *card1, true, true);
+                    engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *card2, true, true);
+                    engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *card3, true, true);
+                    if SIMULATION_IN_PARALLEL {
+                        let mut temp_iterations_per_solution = iterations_per_solution;
+                        while temp_iterations_per_solution > 0 {
+                            solution_engines.push((engine_copy.clone(), min(NUM_SIMULATIONS_TO_SPLIT, temp_iterations_per_solution)));
+                            temp_iterations_per_solution -= NUM_SIMULATIONS_TO_SPLIT;
                         }
                     }
-                    for _ in 0..iterations_per_solution {
-                        let mut temp_engine = engine_copy.clone();
-                        if ClueEngine::do_one_simulation(&mut temp_engine, &available_cards) {
-                            // Results were consistent, so count them
-                            for player_index in 0..temp_engine.player_data.len() {
-                                for card in temp_engine.player_data[player_index].has_cards.iter() {
-                                    simulation_data.get_mut(card).unwrap()[player_index] += 1;
-                                }
-                            }
-                        }
+                    else {
+                        solution_engines.push((engine_copy, iterations_per_solution));
                     }
                 }
             }
         }
+
+        if SIMULATION_IN_PARALLEL {
+            let results: Vec<SimulationData> = solution_engines.par_iter().map(|solution_data| {
+                let mut local_simulation_data = HashMap::new();
+                self.initialize_simulation_data(&mut local_simulation_data);
+                
+                let engine = &solution_data.0;
+                let iterations = solution_data.1;
+                Self::gather_simulation_data(&mut local_simulation_data, &engine, iterations);
+                local_simulation_data
+            }).collect();
+            for result in results {
+                Self::merge_into(&mut simulation_data, &result);
+            }
+        }
+        else {
+            for (engine, iterations) in solution_engines {
+                Self::gather_simulation_data(&mut simulation_data, &engine, iterations);
+            }
+        }
+
         return simulation_data;
+    }
+
+    fn gather_simulation_data(simulation_data: &mut SimulationData, engine: &ClueEngine, iterations: i32) {
+        // Find the available free cards.
+        let mut available_cards: CardSet = CardUtils::all_cards().collect();
+        for player in engine.player_data.iter() {
+            for has_card in player.has_cards.iter() {
+                available_cards.remove(has_card);
+            }
+        }
+        for _ in 0..iterations {
+            let mut temp_engine = engine.clone();
+            if ClueEngine::do_one_simulation(&mut temp_engine, &available_cards) {
+                // Results were consistent, so count them
+                for player_index in 0..temp_engine.player_data.len() {
+                    for card in temp_engine.player_data[player_index].has_cards.iter() {
+                        simulation_data.get_mut(card).unwrap()[player_index] += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    fn merge_into(target: &mut SimulationData, source: &SimulationData) {
+        for (card, counts) in source {
+            let target_counts = target.get_mut(card).unwrap();
+            for i in 0..counts.len() {
+                target_counts[i] += counts[i];
+            }
+        }
     }
 
     // Returns whether the simulation is consistent
     fn do_one_simulation(engine: &mut ClueEngine, available_cards: &CardSet) -> bool {
-        let mut temp_available_cards = available_cards.clone();
-        // Assign all values randomly.
-        for player_index in 0..engine.number_of_real_players() {
-            let player = &engine.player_data[player_index];
-            let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
-            let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
-            // If there are not enough cards available, we're
-            // inconsistent.
-            if player_cards_available.len() < num_cards_needed {
-                return false;
-            }
-            else {
-                for _ in 0..num_cards_needed {
-                    let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
-                    let card_to_add = player_cards_available.remove(index);
-                    temp_available_cards.remove(&card_to_add);
-                    engine.learn_info_on_card(player_index, card_to_add, true, true);
+        const USE_UNBIASED_ALGORITHM: bool = true;
+        if USE_UNBIASED_ALGORITHM {
+            let mut temp_available_cards = available_cards.iter().collect::<Vec<&Card>>();
+            // Assign all values randomly.
+            for player_index in 0..engine.number_of_real_players() {
+                let player = &engine.player_data[player_index];
+                let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
+                //TODO - we could put this check back in
+                //let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+                // If there are not enough cards available, we're
+                // inconsistent.
+                if temp_available_cards.len() < num_cards_needed {
+                    return false;
+                }
+                else {
+                    for _ in 0..num_cards_needed {
+                        let index = (rand::random::<f32>() * temp_available_cards.len() as f32).floor() as usize;
+                        let card_to_add = temp_available_cards.remove(index);
+                        engine.learn_info_on_card(player_index, *card_to_add, true, true);
+                    }
                 }
             }
+        }
+        else {
+            let mut temp_available_cards = available_cards.clone();
+            for player_index in 0..engine.number_of_real_players() {
+                let player = &engine.player_data[player_index];
+                let num_cards_needed = player.num_cards.unwrap() as usize - player.has_cards.len();
+                let mut player_cards_available = temp_available_cards.difference(&player.not_has_cards).map(|&card| card).collect::<Vec<Card>>();
+                // If there are not enough cards available, we're
+                // inconsistent.
+                if player_cards_available.len() < num_cards_needed {
+                    return false;
+                }
+                else {
+                    for _ in 0..num_cards_needed {
+                        let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
+                        let card_to_add = player_cards_available.remove(index);
+                        temp_available_cards.remove(&card_to_add);
+                        engine.learn_info_on_card(player_index, card_to_add, true, true);
+                    }
+                }
+            }
+
         }
         // All players assigned.  Check consistency.
         let is_consistent = engine.player_data.iter().all(|player| {
@@ -821,7 +898,7 @@ impl ClueEngine {
         return is_consistent;
     }
 
-    fn initialize_simulation_data(self: &Self, data: &mut HashMap<Card, Vec<usize>>) {
+    fn initialize_simulation_data(self: &Self, data: &mut SimulationData) {
         for card in CardUtils::all_cards() {
             let zeros = (0..(self.player_data.len())).map(|_| 0).collect();
             data.insert(card, zeros);
@@ -853,7 +930,6 @@ impl ClueEngine {
         return possible_owners;
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1160,5 +1236,35 @@ mod tests {
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(expected, new_clauses);
+    }
+
+    #[test]
+    fn test_merge_into_single_key() {
+        let mut target = SimulationData::new();
+        target.insert(Card::ProfessorPlum, vec![1,2,3]);
+        let mut source = SimulationData::new();
+        source.insert(Card::ProfessorPlum, vec![7,8,9]);
+
+        ClueEngine::merge_into(&mut target, &source);
+
+        assert_eq!(target[&Card::ProfessorPlum], vec![8,10,12]);
+    }
+
+    #[test]
+    fn test_merge_into_multiple_keys() {
+        let mut target = SimulationData::new();
+        target.insert(Card::ProfessorPlum, vec![1,2,3]);
+        target.insert(Card::Knife, vec![0,1,0]);
+        target.insert(Card::Hall, vec![10,2,0]);
+        let mut source = SimulationData::new();
+        source.insert(Card::Hall, vec![3,7,1]);
+        source.insert(Card::Knife, vec![4,2,0]);
+        source.insert(Card::ProfessorPlum, vec![6,3,8]);
+
+        ClueEngine::merge_into(&mut target, &source);
+
+        assert_eq!(target[&Card::ProfessorPlum], vec![7,5,11]);
+        assert_eq!(target[&Card::Knife], vec![4,3,0]);
+        assert_eq!(target[&Card::Hall], vec![13,9,1]);
     }
 }
