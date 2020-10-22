@@ -1,9 +1,12 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::{collections::HashSet, collections::HashMap, iter::Peekable, str::Chars};
+use std::cmp::min;
 use std::iter::FromIterator;
+use rayon::prelude::*;
 
 pub type CardSet = HashSet<Card>;
+pub type SimulationData = HashMap<Card, Vec<usize>>;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, FromPrimitive, Hash, Copy, Clone)]
 pub enum Card {
@@ -732,8 +735,10 @@ impl ClueEngine {
         }
     }
 
-    pub fn do_simulation(self: &Self) -> HashMap<Card, Vec<usize>> {
-        let mut simulation_data = HashMap::new();
+    pub fn do_simulation(self: &Self) -> SimulationData {
+        const SIMULATION_IN_PARALLEL: bool = true;
+        const NUM_SIMULATIONS_TO_SPLIT: i32 = 100;
+        let mut simulation_data = SimulationData::new();
         self.initialize_simulation_data(&mut simulation_data);
         if self.player_data.iter().any(|player| player.num_cards == None) {
             // Can't do simulations if we don't know how many cards everyone has
@@ -760,36 +765,81 @@ impl ClueEngine {
         }
         let number_of_solutions = solution_possibilities.values().map(|cards| cards.len() as i32).product::<i32>();
         let iterations_per_solution = Self::NUM_SIMULATIONS / number_of_solutions;
+        let mut solution_engines: Vec<(ClueEngine, i32)> = vec![];
         for card1 in solution_possibilities.get(&CardType::Suspect).unwrap() {
             for card2 in solution_possibilities.get(&CardType::Weapon).unwrap() {
                 for card3 in solution_possibilities.get(&CardType::Room).unwrap() {
-                    let current_solution: [Card; 3] = [*card1, *card2, *card3];
+                    // Don't split on just cards, because of there are only a few solution possibilities
+                    // we won't get good parallelism.
                     let mut engine_copy = self.clone();
-                    for solution_card in current_solution.iter() {
-                        engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *solution_card, true, true);
-                    }
-                    // Find the available free cards.
-                    let mut available_cards: CardSet = CardUtils::all_cards().collect();
-                    for player in engine_copy.player_data.iter() {
-                        for has_card in player.has_cards.iter() {
-                            available_cards.remove(has_card);
+                    engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *card1, true, true);
+                    engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *card2, true, true);
+                    engine_copy.learn_info_on_card(engine_copy.number_of_real_players(), *card3, true, true);
+                    if SIMULATION_IN_PARALLEL {
+                        let mut temp_iterations_per_solution = iterations_per_solution;
+                        while temp_iterations_per_solution > 0 {
+                            solution_engines.push((engine_copy.clone(), min(NUM_SIMULATIONS_TO_SPLIT, temp_iterations_per_solution)));
+                            temp_iterations_per_solution -= NUM_SIMULATIONS_TO_SPLIT;
                         }
                     }
-                    for _ in 0..iterations_per_solution {
-                        let mut temp_engine = engine_copy.clone();
-                        if ClueEngine::do_one_simulation(&mut temp_engine, &available_cards) {
-                            // Results were consistent, so count them
-                            for player_index in 0..temp_engine.player_data.len() {
-                                for card in temp_engine.player_data[player_index].has_cards.iter() {
-                                    simulation_data.get_mut(card).unwrap()[player_index] += 1;
-                                }
-                            }
-                        }
+                    else {
+                        solution_engines.push((engine_copy, iterations_per_solution));
                     }
                 }
             }
         }
+
+        if SIMULATION_IN_PARALLEL {
+            let results: Vec<SimulationData> = solution_engines.par_iter().map(|solution_data| {
+                let mut local_simulation_data = HashMap::new();
+                self.initialize_simulation_data(&mut local_simulation_data);
+                
+                let engine = &solution_data.0;
+                let iterations = solution_data.1;
+                Self::gather_simulation_data(&mut local_simulation_data, &engine, iterations);
+                local_simulation_data
+            }).collect();
+            for result in results {
+                Self::merge_into(&mut simulation_data, &result);
+            }
+        }
+        else {
+            for (engine, iterations) in solution_engines {
+                Self::gather_simulation_data(&mut simulation_data, &engine, iterations);
+            }
+        }
+
         return simulation_data;
+    }
+
+    fn gather_simulation_data(simulation_data: &mut SimulationData, engine: &ClueEngine, iterations: i32) {
+        // Find the available free cards.
+        let mut available_cards: CardSet = CardUtils::all_cards().collect();
+        for player in engine.player_data.iter() {
+            for has_card in player.has_cards.iter() {
+                available_cards.remove(has_card);
+            }
+        }
+        for _ in 0..iterations {
+            let mut temp_engine = engine.clone();
+            if ClueEngine::do_one_simulation(&mut temp_engine, &available_cards) {
+                // Results were consistent, so count them
+                for player_index in 0..temp_engine.player_data.len() {
+                    for card in temp_engine.player_data[player_index].has_cards.iter() {
+                        simulation_data.get_mut(card).unwrap()[player_index] += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    fn merge_into(target: &mut SimulationData, source: &SimulationData) {
+        for (card, counts) in source {
+            let target_counts = target.get_mut(card).unwrap();
+            for i in 0..counts.len() {
+                target_counts[i] += counts[i];
+            }
+        }
     }
 
     // Returns whether the simulation is consistent
@@ -848,7 +898,7 @@ impl ClueEngine {
         return is_consistent;
     }
 
-    fn initialize_simulation_data(self: &Self, data: &mut HashMap<Card, Vec<usize>>) {
+    fn initialize_simulation_data(self: &Self, data: &mut SimulationData) {
         for card in CardUtils::all_cards() {
             let zeros = (0..(self.player_data.len())).map(|_| 0).collect();
             data.insert(card, zeros);
@@ -880,7 +930,6 @@ impl ClueEngine {
         return possible_owners;
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1187,5 +1236,35 @@ mod tests {
             make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(expected, new_clauses);
+    }
+
+    #[test]
+    fn test_merge_into_single_key() {
+        let mut target = SimulationData::new();
+        target.insert(Card::ProfessorPlum, vec![1,2,3]);
+        let mut source = SimulationData::new();
+        source.insert(Card::ProfessorPlum, vec![7,8,9]);
+
+        ClueEngine::merge_into(&mut target, &source);
+
+        assert_eq!(target[&Card::ProfessorPlum], vec![8,10,12]);
+    }
+
+    #[test]
+    fn test_merge_into_multiple_keys() {
+        let mut target = SimulationData::new();
+        target.insert(Card::ProfessorPlum, vec![1,2,3]);
+        target.insert(Card::Knife, vec![0,1,0]);
+        target.insert(Card::Hall, vec![10,2,0]);
+        let mut source = SimulationData::new();
+        source.insert(Card::Hall, vec![3,7,1]);
+        source.insert(Card::Knife, vec![4,2,0]);
+        source.insert(Card::ProfessorPlum, vec![6,3,8]);
+
+        ClueEngine::merge_into(&mut target, &source);
+
+        assert_eq!(target[&Card::ProfessorPlum], vec![7,5,11]);
+        assert_eq!(target[&Card::Knife], vec![4,3,0]);
+        assert_eq!(target[&Card::Hall], vec![13,9,1]);
     }
 }
