@@ -21,3 +21,7 @@ criterion = "0.3"
 [[bench]]
 name = "simulate_fewconstraints"
 harness = false
+
+[[bench]]
+name = "simulate_manyconstraints"
+harness = false

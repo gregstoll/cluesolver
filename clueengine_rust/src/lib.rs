@@ -398,13 +398,13 @@ impl ClueEngine {
         }
         if update_engine {
             self.check_solution(Some(card), changed_cards);
+        }
 
-            if has_card && self.player_data[player_index].is_solution_player {
-                // We know we have no other cards in this category.
-                for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
-                    if other_card != card {
-                        self.learn_info_on_card_internal(player_index, other_card, false, true, changed_cards);
-                    }
+        if has_card && self.player_data[player_index].is_solution_player {
+            // We know we have no other cards in this category.
+            for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
+                if other_card != card {
+                    self.learn_info_on_card_internal(player_index, other_card, false, true, changed_cards);
                 }
             }
         }
@@ -873,6 +873,10 @@ impl ClueEngine {
                     for _ in 0..num_cards_needed {
                         let index = (rand::random::<f32>() * temp_available_cards.len() as f32).floor() as usize;
                         let card_to_add = temp_available_cards.remove(index);
+                        // see if we're going to be inconsistent and exit early
+                        if engine.player_data[player_index].not_has_cards.contains(card_to_add) {
+                            return false;
+                        }
                         engine.learn_info_on_card_internal(player_index, *card_to_add, true, true, &mut unused_cards);
                     }
                 }
