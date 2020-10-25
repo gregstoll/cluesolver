@@ -25,3 +25,7 @@ harness = false
 [[bench]]
 name = "simulate_manyconstraints"
 harness = false
+
+[[bench]]
+name = "simulate_manymanyconstraints"
+harness = false

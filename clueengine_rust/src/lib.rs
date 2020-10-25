@@ -43,7 +43,19 @@ pub enum CardType {
     Weapon = 6,
     Room  = 12
 }
- 
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone)]
+enum UpdateEngineMode {
+    None,
+    Minimal,
+    All
+}
+
+impl From<bool> for UpdateEngineMode {
+    fn from(b: bool) -> Self {
+        if b { UpdateEngineMode::All } else { UpdateEngineMode::Minimal }
+    }
+}
+
 pub struct CardUtils {
 }
 
@@ -380,11 +392,12 @@ impl ClueEngine {
 
     pub fn learn_info_on_card(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool) -> CardSet {
         let mut changed_cards = HashSet::new();
-        self.learn_info_on_card_internal(player_index, card, has_card, update_engine, &mut changed_cards);
+        let update_mode = UpdateEngineMode::from(update_engine);
+        self.learn_info_on_card_internal(player_index, card, has_card, update_mode, &mut changed_cards);
         return changed_cards;
     }
 
-    fn learn_info_on_card_internal(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: bool, changed_cards: &mut CardSet) {
+    fn learn_info_on_card_internal(self: &mut ClueEngine, player_index: usize, card: Card, has_card: bool, update_engine: UpdateEngineMode, changed_cards: &mut CardSet) {
         {
             let player = &mut self.player_data[player_index];
             if has_card {
@@ -394,17 +407,23 @@ impl ClueEngine {
                 player.not_has_cards.insert(card);
             }
             changed_cards.insert(card);
-            self.examine_clauses(player_index, Some(card), changed_cards);
+            //TODO
+            if update_engine != UpdateEngineMode::None {
+                self.examine_clauses(player_index, Some(card), changed_cards);
+            }
         }
-        if update_engine {
+        if update_engine == UpdateEngineMode::All  {
             self.check_solution(Some(card), changed_cards);
         }
 
-        if has_card && self.player_data[player_index].is_solution_player {
-            // We know we have no other cards in this category.
-            for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
-                if other_card != card {
-                    self.learn_info_on_card_internal(player_index, other_card, false, true, changed_cards);
+        //TODO
+        if update_engine != UpdateEngineMode::None {
+            if has_card && self.player_data[player_index].is_solution_player {
+                // We know we have no other cards in this category.
+                for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
+                    if other_card != card {
+                        self.learn_info_on_card_internal(player_index, other_card, false, update_engine, changed_cards);
+                    }
                 }
             }
         }
@@ -441,7 +460,7 @@ impl ClueEngine {
             if new_clause.len() == 1 {
                 // We have learned player has this card!
                 let new_card = *new_clause.iter().next().unwrap();
-                self.learn_info_on_card_internal(player_index, new_card, true, true, changed_cards);
+                self.learn_info_on_card_internal(player_index, new_card, true, UpdateEngineMode::All, changed_cards);
             } else {
                 self.player_data[player_index].possible_cards.push(new_clause);
             }
@@ -463,7 +482,7 @@ impl ClueEngine {
         loop {
             if refuting_player_index == Some(current_player_index) {
                 if let Some(real_card) = card_shown {
-                    self.learn_info_on_card_internal(current_player_index, real_card, true, true, changed_cards);
+                    self.learn_info_on_card_internal(current_player_index, real_card, true, UpdateEngineMode::All, changed_cards);
                 } else {
                     let possible_cards = HashSet::from_iter(vec![card1, card2, card3].iter().map(|x| *x));
                     self.learn_has_one_of_cards_internal(current_player_index, &possible_cards, changed_cards);
@@ -475,9 +494,9 @@ impl ClueEngine {
                 self.check_solution(None, changed_cards);
                 return;
             } else {
-                self.learn_info_on_card_internal(current_player_index, card1, false, false, changed_cards);
-                self.learn_info_on_card_internal(current_player_index, card2, false, false, changed_cards);
-                self.learn_info_on_card_internal(current_player_index, card3, false, false, changed_cards);
+                self.learn_info_on_card_internal(current_player_index, card1, false, UpdateEngineMode::Minimal, changed_cards);
+                self.learn_info_on_card_internal(current_player_index, card2, false, UpdateEngineMode::Minimal, changed_cards);
+                self.learn_info_on_card_internal(current_player_index, card3, false, UpdateEngineMode::Minimal, changed_cards);
                 current_player_index += 1;
                 if current_player_index == self.number_of_real_players() as usize {
                     current_player_index = 0;
@@ -546,7 +565,7 @@ impl ClueEngine {
                     if !is_possible {
                         // We found a contradiction if we don't have this card,
                         // so we must have this card.
-                        self.learn_info_on_card_internal(player_index, *test_card, true, true, changed_cards);
+                        self.learn_info_on_card_internal(player_index, *test_card, true, UpdateEngineMode::All, changed_cards);
                     }
                 }
             }
@@ -688,7 +707,7 @@ impl ClueEngine {
                     if !affected_people.contains(&idx) {
                         for card in clause.chars().map(|ch| CardUtils::card_from_char(ch).unwrap()) {
                             if self.player_data[idx as usize].has_card(card) != Some(false) {
-                                self.learn_info_on_card_internal(idx as usize, card, false, false, changed_cards);
+                                self.learn_info_on_card_internal(idx as usize, card, false, UpdateEngineMode::Minimal, changed_cards);
                             }
                         }
                     }
@@ -723,14 +742,14 @@ impl ClueEngine {
         }
         if !someone_has_card && number_who_dont_have_card == self.number_of_real_players() {
             // Every player except one doesn't have this card, so we know the player has it.
-            self.learn_info_on_card_internal(player_who_might_have_card.unwrap(), card, true, false, changed_cards);
+            self.learn_info_on_card_internal(player_who_might_have_card.unwrap(), card, true, UpdateEngineMode::Minimal, changed_cards);
         }
         else if someone_has_card {
             // Someone has this card, so no one else does. (including solution)
             for i in 0..self.player_data.len() {
                 let player = &self.player_data[i];
                 if player.has_card(card) == None {
-                    self.learn_info_on_card_internal(i, card, false, false, changed_cards);
+                    self.learn_info_on_card_internal(i, card, false, UpdateEngineMode::Minimal, changed_cards);
                 }
             }
         }
@@ -788,9 +807,9 @@ impl ClueEngine {
 
                     // Call the internal versions to avoid a few allocations
                     let mut ignored_changed_cards = CardSet::new();
-                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card1, true, true, &mut ignored_changed_cards);
-                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card2, true, true, &mut ignored_changed_cards);
-                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card3, true, true, &mut ignored_changed_cards);
+                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card1, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card2, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card3, true, UpdateEngineMode::All, &mut ignored_changed_cards);
                     if SIMULATION_IN_PARALLEL {
                         // Don't split on just cards, because of there are only a few solution possibilities
                         // we won't get good parallelism.
@@ -877,7 +896,7 @@ impl ClueEngine {
                         if engine.player_data[player_index].not_has_cards.contains(card_to_add) {
                             return false;
                         }
-                        engine.learn_info_on_card_internal(player_index, *card_to_add, true, true, &mut unused_cards);
+                        engine.learn_info_on_card_internal(player_index, *card_to_add, true, UpdateEngineMode::All, &mut unused_cards);
                     }
                 }
             }
@@ -898,7 +917,7 @@ impl ClueEngine {
                         let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
                         let card_to_add = player_cards_available.remove(index);
                         temp_available_cards.remove(&card_to_add);
-                        engine.learn_info_on_card_internal(player_index, card_to_add, true, true, &mut unused_cards);
+                        engine.learn_info_on_card_internal(player_index, card_to_add, true, UpdateEngineMode::All, &mut unused_cards);
                     }
                 }
             }
