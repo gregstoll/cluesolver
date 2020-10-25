@@ -896,6 +896,7 @@ impl ClueEngine {
                         if engine.player_data[player_index].not_has_cards.contains(card_to_add) {
                             return false;
                         }
+                        //TODO
                         engine.learn_info_on_card_internal(player_index, *card_to_add, true, UpdateEngineMode::All, &mut unused_cards);
                     }
                 }
@@ -921,7 +922,6 @@ impl ClueEngine {
                     }
                 }
             }
-
         }
         // All players assigned.  Check consistency.
         let is_consistent = engine.player_data.iter().all(|player| {
@@ -940,12 +940,8 @@ impl ClueEngine {
     }
 
     pub fn is_consistent(self: &Self) -> bool {
-        for player in self.player_data.iter() {
-            if player.has_cards.intersection(&player.not_has_cards).any(|_x| true) {
-                return false;
-            }
-        }
-        return true;
+        return self.player_data.iter().all(|player|
+             !player.has_cards.intersection(&player.not_has_cards).any(|_| true));
     }
 
     pub fn who_has_card(self: &Self, card: Card) -> HashSet<usize> {
