@@ -43,6 +43,7 @@ pub enum CardType {
     Weapon = 6,
     Room  = 12
 }
+//TODO - document these
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone)]
 enum UpdateEngineMode {
     None,
@@ -407,7 +408,6 @@ impl ClueEngine {
                 player.not_has_cards.insert(card);
             }
             changed_cards.insert(card);
-            //TODO
             if update_engine != UpdateEngineMode::None {
                 self.examine_clauses(player_index, Some(card), changed_cards);
             }
@@ -416,7 +416,6 @@ impl ClueEngine {
             self.check_solution(Some(card), changed_cards);
         }
 
-        //TODO
         if update_engine != UpdateEngineMode::None {
             if has_card && self.player_data[player_index].is_solution_player {
                 // We know we have no other cards in this category.
@@ -427,6 +426,27 @@ impl ClueEngine {
                 }
             }
         }
+    }
+
+    // Requires that all cards be assigned
+    fn is_consistent_after_all_cards_assigned(self: &mut ClueEngine) -> bool {
+        for player in self.player_data.iter() {
+            if player.has_cards.intersection(&player.not_has_cards).any(|_| true) {
+                // has card and doesn't have card
+                return false;
+            }
+            if player.has_cards.len() != player.num_cards.unwrap() as usize {
+                // wrong number of cards
+                return false;
+            }
+            for clause in player.possible_cards.iter() {
+                if !clause.intersection(&player.has_cards).any(|_| true) {
+                    // This clause is not satisfied
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     pub fn learn_has_one_of_cards(self: &mut ClueEngine, player_index: usize, cards: &CardSet) -> CardSet {
@@ -827,18 +847,24 @@ impl ClueEngine {
         }
 
         if SIMULATION_IN_PARALLEL {
-            let results: Vec<SimulationData> = solution_engines.par_iter().map(|solution_data| {
-                let mut local_simulation_data = HashMap::new();
-                self.initialize_simulation_data(&mut local_simulation_data);
-                
-                let engine = &solution_data.0;
-                let available_cards = &solution_data.1;
-                let iterations = solution_data.2;
-                Self::gather_simulation_data(&mut local_simulation_data, &engine, available_cards, iterations);
-                local_simulation_data
-            }).collect();
-            for result in results {
-                Self::merge_into(&mut simulation_data, &result);
+            let mut iterations = 0;
+            const MAX_ITERATIONS: i32 = 100;
+            // TODO - return iteration info?
+            while iterations < MAX_ITERATIONS && simulation_data.get(&Card::ProfessorPlum).unwrap().iter().sum::<usize>() < 1000 {
+                iterations += 1;
+                let results: Vec<SimulationData> = solution_engines.par_iter().map(|solution_data| {
+                    let mut local_simulation_data = HashMap::new();
+                    self.initialize_simulation_data(&mut local_simulation_data);
+                    
+                    let engine = &solution_data.0;
+                    let available_cards = &solution_data.1;
+                    let iterations = solution_data.2;
+                    Self::gather_simulation_data(&mut local_simulation_data, &engine, available_cards, iterations);
+                    local_simulation_data
+                }).collect();
+                for result in results {
+                    Self::merge_into(&mut simulation_data, &result);
+                }
             }
         }
         else {
@@ -896,8 +922,7 @@ impl ClueEngine {
                         if engine.player_data[player_index].not_has_cards.contains(card_to_add) {
                             return false;
                         }
-                        //TODO
-                        engine.learn_info_on_card_internal(player_index, *card_to_add, true, UpdateEngineMode::All, &mut unused_cards);
+                        engine.learn_info_on_card_internal(player_index, *card_to_add, true, UpdateEngineMode::None, &mut unused_cards);
                     }
                 }
             }
@@ -918,18 +943,13 @@ impl ClueEngine {
                         let index = (rand::random::<f32>() * player_cards_available.len() as f32).floor() as usize;
                         let card_to_add = player_cards_available.remove(index);
                         temp_available_cards.remove(&card_to_add);
-                        engine.learn_info_on_card_internal(player_index, card_to_add, true, UpdateEngineMode::All, &mut unused_cards);
+                        engine.learn_info_on_card_internal(player_index, card_to_add, true, UpdateEngineMode::None, &mut unused_cards);
                     }
                 }
             }
         }
         // All players assigned.  Check consistency.
-        let is_consistent = engine.player_data.iter().all(|player| {
-            let have_and_not_have_card = player.has_cards.intersection(&player.not_has_cards).any(|_| true);
-            let wrong_number_of_cards = player.has_cards.len() != player.num_cards.unwrap() as usize;
-            return !(have_and_not_have_card || wrong_number_of_cards);
-        });
-        return is_consistent;
+        return engine.is_consistent_after_all_cards_assigned();
     }
 
     fn initialize_simulation_data(self: &Self, data: &mut SimulationData) {
