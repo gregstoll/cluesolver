@@ -775,14 +775,14 @@ impl ClueEngine {
         }
     }
 
-    pub fn do_simulation(self: &Self) -> SimulationData {
+    pub fn do_simulation(self: &Self) -> (SimulationData, i32) {
         const SIMULATION_IN_PARALLEL: bool = true;
         const NUM_SIMULATIONS_TO_SPLIT: i32 = 100;
         let mut simulation_data = SimulationData::new();
         self.initialize_simulation_data(&mut simulation_data);
         if self.player_data.iter().any(|player| player.num_cards == None) {
             // Can't do simulations if we don't know how many cards everyone has
-            return simulation_data;
+            return (simulation_data, 0);
         }
         // Find a solution to simulate.
         // FFV - this iteration could be more generalized
@@ -846,6 +846,8 @@ impl ClueEngine {
             }
         }
 
+        let simulations_per_iteration: i32 = solution_engines.iter().map(|data| data.2).sum();
+        let total_number_of_simulations;
         if SIMULATION_IN_PARALLEL {
             let mut iterations = 0;
             const MAX_ITERATIONS: i32 = 100;
@@ -866,14 +868,16 @@ impl ClueEngine {
                     Self::merge_into(&mut simulation_data, &result);
                 }
             }
+            total_number_of_simulations = iterations * simulations_per_iteration;
         }
         else {
             for (engine, available_cards, iterations) in solution_engines {
                 Self::gather_simulation_data(&mut simulation_data, &engine, &available_cards, iterations);
             }
+            total_number_of_simulations = simulations_per_iteration;
         }
 
-        return simulation_data;
+        return (simulation_data, total_number_of_simulations);
     }
 
     fn gather_simulation_data(simulation_data: &mut SimulationData, engine: &ClueEngine, available_cards: &CardSet, iterations: i32) {

@@ -13,7 +13,7 @@ fn main() {
     ];
     for engine in engines.iter() {
         let sim_data = engine.1.do_simulation();
-        println!("{}: {} total (out of 20000)", engine.0, sim_data.get(&Card::ProfessorPlum).unwrap().iter().sum::<usize>());
+        println!("{}: {} total (out of {})", engine.0, sim_data.0.get(&Card::ProfessorPlum).unwrap().iter().sum::<usize>(), sim_data.1);
         //for card in CardUtils::all_cards() {
         //    println!("{:?}: {:?}", card, sim_data.get(&card).unwrap());
         //}

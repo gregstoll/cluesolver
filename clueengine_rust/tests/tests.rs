@@ -376,7 +376,7 @@ mod tests {
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, true, true);
 
         let simulation_data = clue_engine.do_simulation();
-        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         assert!(plum_data[1] > 0);
         for i in 0..(clue_engine.number_of_real_players() + 1) {
             if i != 1 {
@@ -393,7 +393,7 @@ mod tests {
 
         let simulation_data = clue_engine.do_simulation();
 
-        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         assert_eq!(0, plum_data[1]);
         for i in 0..(clue_engine.number_of_real_players() + 1) {
             if i != 1 {
@@ -409,11 +409,10 @@ mod tests {
 
         let simulation_data = clue_engine.do_simulation();
 
-        //TODO - what to do about this
-        for card in simulation_data.keys() {
-            let number_of_simulations: usize = simulation_data.get(card).unwrap().iter().sum();
+        for card in simulation_data.0.keys() {
+            let number_of_simulations: usize = simulation_data.0.get(card).unwrap().iter().sum();
             eprint!("number_of_simulations is {}", number_of_simulations);
-            //TODO - why even this test
+            // Just make sure we have a reasonable number of simulations
             assert!(number_of_simulations >= 1000);
         }
     }
@@ -425,8 +424,8 @@ mod tests {
 
         let simulation_data = clue_engine.do_simulation();
 
-        for card in simulation_data.keys() {
-            let number_of_simulations: usize = simulation_data.get(card).unwrap().iter().sum();
+        for card in simulation_data.0.keys() {
+            let number_of_simulations: usize = simulation_data.0.get(card).unwrap().iter().sum();
             assert!(number_of_simulations > 0);
         }
     }
@@ -440,7 +439,7 @@ mod tests {
 
         // In this game player with index 1 has a bunch of clauses that include Professor Plum and other cards,
         // so it's most likely he has that card
-        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         let max = *plum_data.iter().max().unwrap();
         assert!(max > 0);
         assert_eq!(max, plum_data[1]);
@@ -457,15 +456,15 @@ mod tests {
         // In this game we know players 1-4 don't have ProfessorPlum.
         // Player 5 should have a high chance of having it
         // And it should be significantly more likely to be the solution
-        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         let num_simulations = plum_data.iter().sum::<usize>();
         let player0_plum = plum_data[0];
         let player5_plum = plum_data[5];
         let solution_plum = plum_data[6];
         eprintln!("num_simulations: {:?}", num_simulations);
         eprintln!("Plum: {:?}", plum_data);
-        eprintln!("Knife: {:?}", simulation_data.get(&Card::Knife).unwrap());
-        eprintln!("Mustard: {:?}", simulation_data.get(&Card::ColonelMustard).unwrap());
+        eprintln!("Knife: {:?}", simulation_data.0.get(&Card::Knife).unwrap());
+        eprintln!("Mustard: {:?}", simulation_data.0.get(&Card::ColonelMustard).unwrap());
         assert!(player0_plum > 0);
         assert!(player5_plum as f32 > 0.3 * (num_simulations as f32));
         assert!(solution_plum as f32 > 0.2 * (num_simulations as f32));
@@ -483,15 +482,14 @@ mod tests {
         // In this game we know players 0-4 don't have ProfessorPlum.
         // Player 5 should have a high chance of having it
         // And it should be significantly more likely to be the solution
-        let plum_data = simulation_data.get(&Card::ProfessorPlum).unwrap();
+        let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         let num_simulations = plum_data.iter().sum::<usize>();
         let player5_plum = plum_data[5];
         let solution_plum = plum_data[6];
         eprintln!("num_simulations: {:?}", num_simulations);
         eprintln!("Plum: {:?}", plum_data);
-        eprintln!("Knife: {:?}", simulation_data.get(&Card::Knife).unwrap());
-        eprintln!("Mustard: {:?}", simulation_data.get(&Card::ColonelMustard).unwrap());
-        // TODO - can this be 0.3?
+        eprintln!("Knife: {:?}", simulation_data.0.get(&Card::Knife).unwrap());
+        eprintln!("Mustard: {:?}", simulation_data.0.get(&Card::ColonelMustard).unwrap());
         assert!(player5_plum as f32 > 0.25 * (num_simulations as f32));
         assert!(solution_plum as f32 > 0.3 * (num_simulations as f32));
     }

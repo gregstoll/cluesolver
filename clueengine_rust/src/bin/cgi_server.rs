@@ -105,7 +105,8 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
     if action == "simulate" {
         let simulation_data = engine.do_simulation();
         return Ok(json::object! {
-            "simData": format_simulation_data(&simulation_data)
+            "simData": format_simulation_data(&simulation_data.0),
+            "totalNumSimulations": simulation_data.1
         });
     }
     return Err(format!("Internal error - unexpected action \"{}\"", action));
