@@ -1,3 +1,5 @@
+test
+----
 Here's an easy way to interactively test the CGI server which I learned from https://github.com/rory/rust-cgi:
 
 - cargo build --bin cgi_server
@@ -6,3 +8,12 @@ Here's an easy way to interactively test the CGI server which I learned from htt
 
 Now from a separate command prompt run
     curl http://localhost:8000/cgi-bin/cgi_server
+
+benchmark
+---------
+cargo bench --bench simulate_fewconstraints
+
+profile
+-------
+cargo flamegraph --bin simulation_fewconstraints
+  (doesn't work though, even on linux running as root)
