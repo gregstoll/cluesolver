@@ -432,9 +432,15 @@ impl ClueEngine {
     fn is_consistent_after_all_cards_assigned(self: &mut ClueEngine) -> bool {
         let mut cards_seen = CardSet::new();
         for player in self.player_data.iter() {
-            if player.has_cards.intersection(&player.not_has_cards).any(|_| true) {
-                // has card and doesn't have card
-                return false;
+            for &card in player.has_cards.iter() {
+                if player.not_has_cards.contains(&card) {
+                    // has card and doesn't have card
+                    return false;
+                }
+                if !cards_seen.insert(card) {
+                    // Already seen this card in someone else's cards, so not consistent
+                    return false;
+                }
             }
             if player.has_cards.len() != player.num_cards.unwrap() as usize {
                 // wrong number of cards
@@ -443,13 +449,6 @@ impl ClueEngine {
             for clause in player.possible_cards.iter() {
                 if !clause.intersection(&player.has_cards).any(|_| true) {
                     // This clause is not satisfied
-                    return false;
-                }
-            }
-            //TODO - can unroll the intersection with not_has_cards above for perf?
-            for card in player.has_cards.iter() {
-                if !cards_seen.insert(*card) {
-                    // Already seen this card in someone else's cards, so not consistent
                     return false;
                 }
             }
