@@ -372,6 +372,7 @@ mod tests {
     #[test]
     #[ignore] // This test is slow
     fn test_simulation_known_person_has_card() {
+        //TODO - for all of these assert numbers for each card are equal
         let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, true, true);
 

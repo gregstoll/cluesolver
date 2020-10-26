@@ -430,6 +430,7 @@ impl ClueEngine {
 
     // Requires that all cards be assigned
     fn is_consistent_after_all_cards_assigned(self: &mut ClueEngine) -> bool {
+        let mut cards_seen = CardSet::new();
         for player in self.player_data.iter() {
             if player.has_cards.intersection(&player.not_has_cards).any(|_| true) {
                 // has card and doesn't have card
@@ -442,6 +443,13 @@ impl ClueEngine {
             for clause in player.possible_cards.iter() {
                 if !clause.intersection(&player.has_cards).any(|_| true) {
                     // This clause is not satisfied
+                    return false;
+                }
+            }
+            //TODO - can unroll the intersection with not_has_cards above for perf?
+            for card in player.has_cards.iter() {
+                if !cards_seen.insert(*card) {
+                    // Already seen this card in someone else's cards, so not consistent
                     return false;
                 }
             }
@@ -851,7 +859,6 @@ impl ClueEngine {
         if SIMULATION_IN_PARALLEL {
             let mut iterations = 0;
             const MAX_ITERATIONS: i32 = 100;
-            // TODO - return iteration info?
             while iterations < MAX_ITERATIONS && simulation_data.get(&Card::ProfessorPlum).unwrap().iter().sum::<usize>() < 1000 {
                 iterations += 1;
                 let results: Vec<SimulationData> = solution_engines.par_iter().map(|solution_data| {
@@ -871,10 +878,15 @@ impl ClueEngine {
             total_number_of_simulations = iterations * simulations_per_iteration;
         }
         else {
-            for (engine, available_cards, iterations) in solution_engines {
-                Self::gather_simulation_data(&mut simulation_data, &engine, &available_cards, iterations);
+            let mut iterations = 0;
+            const MAX_ITERATIONS: i32 = 100;
+            while iterations < MAX_ITERATIONS && simulation_data.get(&Card::ProfessorPlum).unwrap().iter().sum::<usize>() < 1000 {
+                iterations += 1;
+                for (engine, available_cards, iterations) in &solution_engines {
+                    Self::gather_simulation_data(&mut simulation_data, &engine, &available_cards, *iterations);
+                }
             }
-            total_number_of_simulations = simulations_per_iteration;
+            total_number_of_simulations = iterations * simulations_per_iteration;
         }
 
         return (simulation_data, total_number_of_simulations);

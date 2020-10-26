@@ -445,8 +445,10 @@ mod tests {
             assert_eq!(0, result["simData"]["Ballroom"][i]);
         }
         eprintln!("{}", result["simData"]["Ballroom"][0].as_i32().unwrap());
-        // TODO - shouldn't this always be > 900??
-        assert!(result["simData"]["Ballroom"][0].as_i32().unwrap() > 200);
+        eprintln!("Plum: {}", result["simData"]["ProfessorPlum"]);
+        eprintln!("Ballroom: {}", result["simData"]["Ballroom"]);
+        eprintln!("{}", result["totalNumSimulations"].as_i32().unwrap());
+        assert!(result["simData"]["Ballroom"][0].as_i32().unwrap() > 900);
     }
 
     #[test]
