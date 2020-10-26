@@ -37,7 +37,7 @@ interface CardName {
 }
 const NONE_CARD_INDEX: CardIndex = { card_type: -1, index: -1 };
 function isNone(cardIndex: CardIndex) {
-    return cardIndex.card_type == NONE_CARD_INDEX.card_type && cardIndex.index == NONE_CARD_INDEX.index;
+    return cardIndex.card_type === NONE_CARD_INDEX.card_type && cardIndex.index === NONE_CARD_INDEX.index;
 }
 let CARD_NAMES : Array<Array<CardName>> = [];
 let INTERNAL_NAME_TO_CARD_INDEX = new Map<string, CardIndex>();
@@ -73,7 +73,7 @@ class NumberOfPlayerOption extends Component<NumberOfPlayerOptionProps, {}> {
     }
     render = () => {
         let id = "numberOfPlayersInput" + this.props.thisNumberOfPlayers;
-        return <span><input type="radio" name="numberOfPlayer" id={id} value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers == this.props.numberOfPlayers} onChange={this.handleChange} disabled={!this.props.allowChange}/><label htmlFor={id}> {this.props.thisNumberOfPlayers}</label></span>;
+        return <span><input type="radio" name="numberOfPlayer" id={id} value="{this.props.thisNumberOfPlayers}" checked={this.props.thisNumberOfPlayers === this.props.numberOfPlayers} onChange={this.handleChange} disabled={!this.props.allowChange}/><label htmlFor={id}> {this.props.thisNumberOfPlayers}</label></span>;
     }
 }
 
@@ -162,7 +162,7 @@ class NumberOfCardsValidator extends Component<NumberOfCardsValidatorProps, {}> 
     render = () => {
         let totalNumberOfCards = this.props.playerInfo.reduce((previousValue, currentValue) => previousValue + currentValue.numberOfCards, 0);
         let badNumberOfCardsElem = null;
-        if (totalNumberOfCards != TOTAL_CARDS_FOR_PLAYERS) {
+        if (totalNumberOfCards !== TOTAL_CARDS_FOR_PLAYERS) {
             badNumberOfCardsElem = <span className="warning">Total number of cards must total {TOTAL_CARDS_FOR_PLAYERS}! (not {totalNumberOfCards})</span>;
         }
         return <div>{badNumberOfCardsElem}</div>;
@@ -249,7 +249,7 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
         let s = "";
         for (let i = 0; i < this.props.cardInfo.owners.length; ++i) {
             let curIndex = this.props.cardInfo.owners[i];
-            if (curIndex == this.props.playerInfos.length) {
+            if (curIndex === this.props.playerInfos.length) {
                 s += "(solution)";
             }
             else {
@@ -265,10 +265,8 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
         switch (this.props.cardInfo.state) {
             case CardState.OwnedByPlayer:
               return "Owned by " + this.getOwnedByString();
-              break;
             case CardState.OwnedByCasefile:
               return "Solution!";
-              break;
             case CardState.Unknown:
             default:
               if (this.props.cardInfo.owners && this.props.cardInfo.owners.length > 0) {
@@ -276,7 +274,6 @@ class SpecificCardInfo extends React.Component<SpecificCardInfoProps, {}> {
               } else {
                   return "Unknown";
               }
-              break;
         }
     }
     render = () => {
@@ -347,7 +344,7 @@ class History extends React.Component<HistoryProps, {}> {
                         cardNameFromCardIndex({ card_type: CardType.Suspects, index: event.suspect_index }).external + ", " +
                         cardNameFromCardIndex({ card_type: CardType.Weapons, index: event.weapon_index }).external + ", " +
                         cardNameFromCardIndex({ card_type: CardType.Rooms, index: event.room_index }).external + " ";
-                    if (event.refuter_index == -1) {
+                    if (event.refuter_index === -1) {
                         description += " - no one refuted";
                     }
                     else {
@@ -373,7 +370,7 @@ class History extends React.Component<HistoryProps, {}> {
 
         return <div>
           <ul>{entries}</ul>
-          <div><button type="button" disabled={entries.length == 0} onClick={this.doUndo}>Undo latest information</button></div>
+          <div><button type="button" disabled={entries.length === 0} onClick={this.doUndo}>Undo latest information</button></div>
         </div>;
     }
 }
@@ -532,7 +529,7 @@ class CardSelector extends React.Component<CardSelectorProps, {}> {
     }
     render = () => {
         let options = [];
-        let allCardTypes = this.props.cardType == -1;
+        let allCardTypes = this.props.cardType === -1;
         let iMin = allCardTypes ? 0 : this.props.cardType;
         let iMax = allCardTypes ? CARD_TYPE_NAMES.length : (this.props.cardType + 1);
         let label = allCardTypes ? "Card" : CARD_TYPE_NAMES[this.props.cardType];
@@ -573,7 +570,7 @@ class RefutingCardSelector extends React.Component<RefutingCardSelectorProps, {}
         for (let i = 0; i < this.props.cardIndices.length; ++i) {
             let cardInfo = CARD_NAMES[i][this.props.cardIndices[i]];
             let cardIndexString = this.cardIndexToOptionString(cardInfo.card_index);
-            if (selectedCardIndexString == cardIndexString) {
+            if (selectedCardIndexString === cardIndexString) {
                 invalidSelectedCard = false;
             }
             options.push(<option value={cardIndexString} key={cardInfo.card_index.card_type}>{cardInfo.external}</option>);
@@ -644,10 +641,11 @@ interface SimulationProps {
     sendClueRequest: (data: string, successCallback: (responseJson : any) => void, failureCallback: (message : string) => void, skipWorking?: boolean) => void,
     session: string | null,
     cardIndexFromInternalName : (name: string) => CardIndex,
-    setNumberOfSimulations: (simulations: number) => void,
+    setNumberOfSimulations: (simulationsSucceeded: number, simulationsTried: number) => void,
     setSimulationData: (simulationData: SimulationData) => void,
     simData: SimulationData,
-    numberOfSimulations: number,
+    numberOfSimulationsSucceeded?: number,
+    numberOfSimulationsTried?: number,
     doingSimulation: boolean,
     isConsistent: boolean
 }
@@ -669,8 +667,9 @@ class Simulation extends React.Component<SimulationProps, {}> {
                     simData.set(key, data.map((x: number) => 0.0));
                 }
             }
+            let numberOfSimsTried = json.totalNumSimulations;
             that.props.setDoingSimulation(false);
-            that.props.setNumberOfSimulations(totalNumberOfSims);
+            that.props.setNumberOfSimulations(totalNumberOfSims, numberOfSimsTried);
             that.props.setSimulationData(simData);
         }, function(errorText) {
             alert('Error: ' + errorText);
@@ -714,12 +713,12 @@ class Simulation extends React.Component<SimulationProps, {}> {
         }
         playerHeaderEntries.push(<th className="playerHeader" key="solution">Solution</th>);
         for (let i = 0; i < CARD_TYPE_NAMES.length; ++i) {
-            infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th>{i == 0 ? playerHeaderEntries : undefined}</tr>);
+            infoRows.push(<tr key={i}><th style={{textAlign: 'left'}}>{CARD_TYPE_NAMES[i]}</th>{i === 0 ? playerHeaderEntries : undefined}</tr>);
             for (let j = 0; j < CARD_NAMES[i].length; ++j) {
                 let cells = [<td key="cardName">{CARD_NAMES[i][j].external}</td>];
                 let dataArray = this.props.simData.get(CARD_NAMES[i][j].internal);
                 for (let k = 0; k < this.props.playerInfos.length; ++k) {
-                    if (dataArray != undefined && dataArray[k] !== undefined) {
+                    if (dataArray !== undefined && dataArray[k] !== undefined) {
                         let v = (Math.round(dataArray[k] * 1000) / 10);
                         let c = this.getColorProp(v);
                         let vString = Number(v).toFixed(1) + '%';
@@ -730,7 +729,7 @@ class Simulation extends React.Component<SimulationProps, {}> {
                     }
                 }
                 let sc = {};
-                if (dataArray != undefined && dataArray[this.props.playerInfos.length] !== undefined) {
+                if (dataArray !== undefined && dataArray[this.props.playerInfos.length] !== undefined) {
                     let percent = (Math.round(dataArray[this.props.playerInfos.length] * 1000) / 10);
                     sc = this.getColorProp(percent);
                     let percentString = Number(percent).toFixed(1) + '%';
@@ -747,9 +746,9 @@ class Simulation extends React.Component<SimulationProps, {}> {
             working = <img src="images/loading.gif"/>;
         }
         let simulationSpan = undefined;
-        if (this.props.numberOfSimulations > -1) {
-            if (this.props.numberOfSimulations > 0) {
-                simulationSpan = <span style={{marginLeft: 20, fontStyle: "italic"}}>Simulations done: {this.props.numberOfSimulations}</span>;
+        if (this.props.numberOfSimulationsSucceeded !== undefined) {
+            if (this.props.numberOfSimulationsSucceeded > 0) {
+                simulationSpan = <span style={{marginLeft: 20, fontStyle: "italic"}}>Simulations done: {this.props.numberOfSimulationsSucceeded} of {this.props.numberOfSimulationsTried!} tried</span>;
             } else {
                 simulationSpan = <span className="warning" style={{marginLeft: 20, fontStyle: "italic"}}>No simulations done!</span>;
             }
@@ -778,7 +777,8 @@ interface AppState {
     working: boolean,
     simData: SimulationData,
     doingSimulation: boolean,
-    numberOfSimulations: number,
+    numberOfSimulationsSucceeded?: number,
+    numberOfSimulationsTried?: number,
     // This is an opaque description of the session that's provided and understood by the backing Python script
     session: string | null
 }
@@ -809,15 +809,16 @@ class App extends Component<{}, AppState> {
             working: false,
             simData: new Map<string, Array<number>>(),
             doingSimulation: false,
-            numberOfSimulations: -1,
+            numberOfSimulationsSucceeded: undefined,
+            numberOfSimulationsTried: undefined,
             session: null
         };
     }
     setSimulationData = (data: SimulationData) => {
         this.setState({simData: data});
     }
-    setNumberOfSimulations = (n: number) => {
-        this.setState({numberOfSimulations: n});
+    setNumberOfSimulations = (numberSucceeded: number, numberTried: number) => {
+        this.setState({numberOfSimulationsSucceeded: numberSucceeded, numberOfSimulationsTried: numberTried});
     }
     setDoingSimulation = (isDoingSimulation: boolean) => {
         this.setState({doingSimulation: isDoingSimulation});
@@ -829,7 +830,7 @@ class App extends Component<{}, AppState> {
             this.setState({working: true});
         }
         let url = SCRIPT_NAME;
-        if (!isNullOrUndefined(data) && data != "") {
+        if (data !== "") {
             url += "?" + data;
         }
         let promise = fetch(url);
@@ -857,7 +858,7 @@ class App extends Component<{}, AppState> {
     }
     internalSetNumberOfPlayers = (previousPlayerInfo: Array<PlayerInfo>, numberOfPlayers: number) => {
         let playerInfo = previousPlayerInfo.slice(0, previousPlayerInfo.length);
-        if (playerInfo.length == numberOfPlayers) {
+        if (playerInfo.length === numberOfPlayers) {
             return playerInfo;
         }
         if (playerInfo.length > numberOfPlayers) {
@@ -928,7 +929,7 @@ class App extends Component<{}, AppState> {
             playerInfos: playerInfos,
             session: json.session,
             clauseInfos: clauseInfos,
-            isConsistent: json.isConsistent && totalCards == TOTAL_CARDS_FOR_PLAYERS,
+            isConsistent: json.isConsistent && totalCards === TOTAL_CARDS_FOR_PLAYERS,
             haveEnteredData: haveEnteredData
         });
     }
@@ -1013,12 +1014,12 @@ class App extends Component<{}, AppState> {
     componentDidUpdate = (prevProps: {}, prevState: AppState, snapshot: any) => {
         // See if the number of players or cards per player has changed
         let mismatch: boolean = false;
-        if (prevState.playerInfos.length != this.state.playerInfos.length) {
+        if (prevState.playerInfos.length !== this.state.playerInfos.length) {
             mismatch = true;
         }
         if (!mismatch) {
             for (let i = 0; i < prevState.playerInfos.length; ++i) {
-                if (prevState.playerInfos[i].numberOfCards != this.state.playerInfos[i].numberOfCards) {
+                if (prevState.playerInfos[i].numberOfCards !== this.state.playerInfos[i].numberOfCards) {
                     mismatch = true;
                     break;
                 }
@@ -1075,7 +1076,8 @@ class App extends Component<{}, AppState> {
                             sendClueRequest={this.sendClueRequest}
                             cardIndexFromInternalName={this.cardIndexFromInternalName}
                             simData={this.state.simData}
-                            numberOfSimulations={this.state.numberOfSimulations}
+                            numberOfSimulationsSucceeded={this.state.numberOfSimulationsSucceeded}
+                            numberOfSimulationsTried={this.state.numberOfSimulationsTried}
                             doingSimulation={this.state.doingSimulation}
                             setSimulationData={this.setSimulationData}
                             setNumberOfSimulations={this.setNumberOfSimulations}
