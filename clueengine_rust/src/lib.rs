@@ -784,7 +784,7 @@ impl ClueEngine {
 
     pub fn do_simulation(self: &Self) -> (SimulationData, i32) {
         const SIMULATION_IN_PARALLEL: bool = true;
-        const NUM_SIMULATIONS_TO_SPLIT: i32 = 100;
+        const NUM_SIMULATIONS_TO_SPLIT: i32 = 1000;
         let mut simulation_data = SimulationData::new();
         self.initialize_simulation_data(&mut simulation_data);
         if self.player_data.iter().any(|player| player.num_cards == None) {
