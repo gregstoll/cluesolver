@@ -917,7 +917,6 @@ impl ClueEngine {
     // Returns whether the simulation is consistent
     fn do_one_simulation(engine: &mut ClueEngine, available_cards: &CardSet) -> bool {
         const USE_UNBIASED_ALGORITHM: bool = true;
-        // TODO - have this be passed in to avoid allocating it every time
         let mut unused_cards = CardSet::new();
         if USE_UNBIASED_ALGORITHM {
             let mut temp_available_cards = available_cards.iter().collect::<Vec<&Card>>();
