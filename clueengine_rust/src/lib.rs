@@ -407,9 +407,8 @@ impl ClueEngine {
             else {
                 player.not_has_cards.insert(card);
             }
-            // TODO - move this into the next block?
-            changed_cards.insert(card);
             if update_engine != UpdateEngineMode::None {
+                changed_cards.insert(card);
                 self.examine_clauses(player_index, Some(card), changed_cards);
             }
         }
