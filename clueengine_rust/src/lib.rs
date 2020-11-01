@@ -45,10 +45,12 @@ impl FastSimulationData {
         return (&self.data[0..self.num_players]).iter().sum::<usize>();
     }
 
+    #[allow(dead_code)]
     fn get_card_data(self: &FastSimulationData, card: Card) -> &[usize] {
         return &self.data[(card as usize * self.num_players)..(card as usize * self.num_players + self.num_players)];
     }
 
+    #[allow(dead_code)]
     fn get_entry_mut(self: &mut FastSimulationData, card: Card, player_index: usize) -> &mut usize {
         return &mut self.data[(card as usize * self.num_players) + player_index];
     }
