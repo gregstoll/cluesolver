@@ -12,16 +12,20 @@ pub type SimulationData = HashMap<Card, Vec<usize>>;
 
 #[derive(Clone,Debug)]
 struct FastSimulationData {
+    num_players: usize,
     // First index is the card
     // Second index is the player
-    data: Vec<Vec<usize>>,
+    // index of (card, player) count is
+    // card * num_players + player
+    data: Vec<usize>,
 }
 
 impl From<&FastSimulationData> for SimulationData {
     fn from(data: &FastSimulationData) -> Self {
         let mut sim_data = SimulationData::new();
         for card in CardUtils::all_cards() {
-            sim_data.insert(card, data.data[card as usize].clone());
+            let card_data = &data.data[(card as usize * data.num_players)..(card as usize * data.num_players + data.num_players)];
+            sim_data.insert(card, Vec::from(card_data));
         }
         return sim_data;
     }
@@ -30,15 +34,36 @@ impl From<&FastSimulationData> for SimulationData {
 impl FastSimulationData {
     fn new(engine: &ClueEngine) -> Self {
         let mut data = vec![];
-        let zeros = (0..(engine.player_data.len())).map(|_| 0).collect();
-        data.resize(CARD_LAST as usize, zeros);
+        data.resize(engine.player_data.len() * CARD_LAST as usize, 0);
         FastSimulationData {
+            num_players: engine.player_data.len(),
             data
         }
     }
 
     fn num_simulations(self: &FastSimulationData) -> usize {
-        return self.data[0].iter().sum::<usize>();
+        return (&self.data[0..self.num_players]).iter().sum::<usize>();
+    }
+
+    fn get_card_data(self: &FastSimulationData, card: Card) -> &[usize] {
+        return &self.data[(card as usize * self.num_players)..(card as usize * self.num_players + self.num_players)];
+    }
+
+    fn get_entry_mut(self: &mut FastSimulationData, card: Card, player_index: usize) -> &mut usize {
+        return &mut self.data[(card as usize * self.num_players) + player_index];
+    }
+
+    fn increment_entry(self: &mut FastSimulationData, card: Card, player_index: usize) {
+        self.data[(card as usize * self.num_players) + player_index] += 1;
+        /*let index = (card as usize * self.num_players) + player_index;
+        let x = self.data.get_unchecked_mut(index);
+        *x = *x + 1;*/
+    }
+
+    fn accumulate_from(self: &mut FastSimulationData, source: &FastSimulationData) {
+        for i in 0..self.data.len() {
+            self.data[i] += source.data[i];
+        }
     }
 }
 
@@ -906,7 +931,7 @@ impl ClueEngine {
                     local_simulation_data
                 }).collect();
                 for result in results {
-                    Self::merge_into(&mut fast_simulation_data, &result);
+                    fast_simulation_data.accumulate_from(&result);
                 }
             }
             total_number_of_simulations = iterations * simulations_per_iteration;
@@ -936,19 +961,9 @@ impl ClueEngine {
                 // Results were consistent, so count them
                 for player_index in 0..temp_engine.player_data.len() {
                     for card in temp_engine.player_data[player_index].has_cards.iter() {
-                        simulation_data.data[*card as usize][player_index] += 1;
+                        simulation_data.increment_entry(*card, player_index);
                     }
                 }
-            }
-        }
-    }
-
-    fn merge_into(target: &mut FastSimulationData, source: &FastSimulationData) {
-        for i in 0..CARD_LAST {
-            let target_counts = target.data.get_mut(i as usize).unwrap();
-            let counts = source.data.get(i as usize).unwrap();
-            for i in 0..counts.len() {
-                target_counts[i] += counts[i];
             }
         }
     }
@@ -1325,45 +1340,45 @@ mod tests {
     fn test_merge_into_single_key() {
         let engine = ClueEngine::new(5, None).unwrap();
         let mut target = FastSimulationData::new(&engine);
-        target.data.get_mut(0).unwrap()[0] = 1;
-        target.data.get_mut(0).unwrap()[1] = 2;
-        target.data.get_mut(0).unwrap()[2] = 3;
+        *target.get_entry_mut(Card::ProfessorPlum, 0) = 1;
+        *target.get_entry_mut(Card::ProfessorPlum, 1) = 2;
+        *target.get_entry_mut(Card::ProfessorPlum, 2) = 3;
         let mut source = FastSimulationData::new(&engine);
-        source.data.get_mut(0).unwrap()[0] = 7;
-        source.data.get_mut(0).unwrap()[1] = 8;
-        source.data.get_mut(0).unwrap()[2] = 9;
+        *source.get_entry_mut(Card::ProfessorPlum, 0) = 7;
+        *source.get_entry_mut(Card::ProfessorPlum, 1) = 8;
+        *source.get_entry_mut(Card::ProfessorPlum, 2) = 9;
 
-        ClueEngine::merge_into(&mut target, &source);
+        target.accumulate_from(&source);
 
-        assert_eq!(target.data.get(0).unwrap(), &vec![8 as usize,10,12,0,0,0]);
+        assert_eq!(target.get_card_data(FromPrimitive::from_i32(0).unwrap()), vec![8 as usize,10,12,0,0,0]);
     }
 
     #[test]
     fn test_merge_into_multiple_keys() {
         let engine = ClueEngine::new(2, None).unwrap();
         let mut target = FastSimulationData::new(&engine);
-        target.data.get_mut(0).unwrap()[0] = 1;
-        target.data.get_mut(0).unwrap()[1] = 2;
-        target.data.get_mut(0).unwrap()[2] = 3;
-        target.data.get_mut(1).unwrap()[0] = 4;
-        target.data.get_mut(1).unwrap()[1] = 6;
-        target.data.get_mut(1).unwrap()[2] = 8;
-        target.data.get_mut(3).unwrap()[0] = 9;
-        target.data.get_mut(3).unwrap()[1] = 7;
-        target.data.get_mut(3).unwrap()[2] = 3;
+        *target.get_entry_mut(Card::ProfessorPlum, 0) = 1;
+        *target.get_entry_mut(Card::ProfessorPlum, 1) = 2;
+        *target.get_entry_mut(Card::ProfessorPlum, 2) = 3;
+        *target.get_entry_mut(Card::ColonelMustard, 0) = 4;
+        *target.get_entry_mut(Card::ColonelMustard, 1) = 6;
+        *target.get_entry_mut(Card::ColonelMustard, 2) = 8;
+        *target.get_entry_mut(Card::MissScarlet, 0) = 9;
+        *target.get_entry_mut(Card::MissScarlet, 1) = 7;
+        *target.get_entry_mut(Card::MissScarlet, 2) = 3;
         let mut source = FastSimulationData::new(&engine);
-        source.data.get_mut(0).unwrap()[0] = 7;
-        source.data.get_mut(0).unwrap()[1] = 8;
-        source.data.get_mut(0).unwrap()[2] = 9;
-        source.data.get_mut(2).unwrap()[0] = 11;
-        source.data.get_mut(2).unwrap()[1] = 13;
-        source.data.get_mut(2).unwrap()[2] = 12;
+        *source.get_entry_mut(Card::ProfessorPlum, 0) = 7;
+        *source.get_entry_mut(Card::ProfessorPlum, 1) = 8;
+        *source.get_entry_mut(Card::ProfessorPlum, 2) = 9;
+        *source.get_entry_mut(Card::MrGreen, 0) = 11;
+        *source.get_entry_mut(Card::MrGreen, 1) = 13;
+        *source.get_entry_mut(Card::MrGreen, 2) = 12;
 
-        ClueEngine::merge_into(&mut target, &source);
+        target.accumulate_from(&source);
 
-        assert_eq!(target.data.get(0).unwrap(), &vec![8 as usize,10,12]);
-        assert_eq!(target.data.get(1).unwrap(), &vec![4 as usize,6,8]);
-        assert_eq!(target.data.get(2).unwrap(), &vec![11 as usize,13,12]);
-        assert_eq!(target.data.get(3).unwrap(), &vec![9 as usize,7,3]);
+        assert_eq!(target.get_card_data(Card::ProfessorPlum), vec![8 as usize,10,12]);
+        assert_eq!(target.get_card_data(Card::ColonelMustard), vec![4 as usize,6,8]);
+        assert_eq!(target.get_card_data(Card::MrGreen), vec![11 as usize,13,12]);
+        assert_eq!(target.get_card_data(Card::MissScarlet), vec![9 as usize,7,3]);
     }
 }
