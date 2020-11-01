@@ -9,9 +9,38 @@ use rayon::prelude::*;
 
 pub type CardSet = HashSet<Card>;
 pub type SimulationData = HashMap<Card, Vec<usize>>;
-// First index is the card
-// Second index is the player
-pub type FastSimulationData = Vec<Vec<usize>>;
+
+#[derive(Clone,Debug)]
+struct FastSimulationData {
+    // First index is the card
+    // Second index is the player
+    data: Vec<Vec<usize>>,
+}
+
+impl From<&FastSimulationData> for SimulationData {
+    fn from(data: &FastSimulationData) -> Self {
+        let mut sim_data = SimulationData::new();
+        for card in CardUtils::all_cards() {
+            sim_data.insert(card, data.data[card as usize].clone());
+        }
+        return sim_data;
+    }
+}
+
+impl FastSimulationData {
+    fn new(engine: &ClueEngine) -> Self {
+        let mut data = vec![];
+        let zeros = (0..(engine.player_data.len())).map(|_| 0).collect();
+        data.resize(CARD_LAST as usize, zeros);
+        FastSimulationData {
+            data
+        }
+    }
+
+    fn num_simulations(self: &FastSimulationData) -> usize {
+        return self.data[0].iter().sum::<usize>();
+    }
+}
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, FromPrimitive, Hash, Copy, Clone)]
 pub enum Card {
@@ -797,8 +826,7 @@ impl ClueEngine {
             self.initialize_simulation_data(&mut simulation_data);
             return (simulation_data, 0);
         }
-        let mut fast_simulation_data = FastSimulationData::new();
-        self.initialize_fast_simulation_data(&mut fast_simulation_data);
+        let mut fast_simulation_data = FastSimulationData::new(self);
         // Find a solution to simulate.
         // FFV - this iteration could be more generalized
         let mut solution_possibilities: HashMap<CardType, Vec<Card>> = HashMap::new();
@@ -866,11 +894,10 @@ impl ClueEngine {
         if SIMULATION_IN_PARALLEL {
             let mut iterations = 0;
             const MAX_ITERATIONS: i32 = 100;
-            while iterations < MAX_ITERATIONS && fast_simulation_data[0].iter().sum::<usize>() < 1000 {
+            while iterations < MAX_ITERATIONS && fast_simulation_data.num_simulations() < 1000 {
                 iterations += 1;
                 let results: Vec<FastSimulationData> = solution_engines.par_iter().map(|solution_data| {
-                    let mut local_simulation_data = FastSimulationData::new();
-                    self.initialize_fast_simulation_data(&mut local_simulation_data);
+                    let mut local_simulation_data = FastSimulationData::new(self);
                     
                     let engine = &solution_data.0;
                     let available_cards = &solution_data.1;
@@ -887,7 +914,7 @@ impl ClueEngine {
         else {
             let mut iterations = 0;
             const MAX_ITERATIONS: i32 = 100;
-            while iterations < MAX_ITERATIONS && fast_simulation_data[0].iter().sum::<usize>() < 1000 {
+            while iterations < MAX_ITERATIONS && fast_simulation_data.num_simulations() < 1000 {
                 iterations += 1;
                 for (engine, available_cards, iterations) in &solution_engines {
                     Self::gather_simulation_data(&mut fast_simulation_data, &engine, &available_cards, *iterations);
@@ -896,8 +923,7 @@ impl ClueEngine {
             total_number_of_simulations = iterations * simulations_per_iteration;
         }
 
-        // TODO - use From trait or something
-        return (Self::simulation_data_from_fast_simulation_data(&fast_simulation_data), total_number_of_simulations);
+        return (SimulationData::from(&fast_simulation_data), total_number_of_simulations);
     }
 
     // Note that we do at least 20,000 of these, so performance is very important!
@@ -910,7 +936,7 @@ impl ClueEngine {
                 // Results were consistent, so count them
                 for player_index in 0..temp_engine.player_data.len() {
                     for card in temp_engine.player_data[player_index].has_cards.iter() {
-                        simulation_data[*card as usize][player_index] += 1;
+                        simulation_data.data[*card as usize][player_index] += 1;
                     }
                 }
             }
@@ -919,8 +945,8 @@ impl ClueEngine {
 
     fn merge_into(target: &mut FastSimulationData, source: &FastSimulationData) {
         for i in 0..CARD_LAST {
-            let target_counts = target.get_mut(i as usize).unwrap();
-            let counts = source.get(i as usize).unwrap();
+            let target_counts = target.data.get_mut(i as usize).unwrap();
+            let counts = source.data.get(i as usize).unwrap();
             for i in 0..counts.len() {
                 target_counts[i] += counts[i];
             }
@@ -964,20 +990,6 @@ impl ClueEngine {
             let zeros = (0..(self.player_data.len())).map(|_| 0).collect();
             data.insert(card, zeros);
         }
-    }
-
-    fn initialize_fast_simulation_data(self: &Self, data: &mut FastSimulationData) {
-        let zeros = (0..(self.player_data.len())).map(|_| 0).collect();
-        data.resize(CARD_LAST as usize, zeros);
-    }
-    
-    // TODO - use the From trait, which requires our own types or something
-    fn simulation_data_from_fast_simulation_data(fast_data: &FastSimulationData) -> SimulationData {
-        let mut data = SimulationData::new();
-        for card in CardUtils::all_cards() {
-            data.insert(card, fast_data[card as usize].clone());
-        }
-        return data
     }
 
     pub fn is_consistent(self: &Self) -> bool {
@@ -1312,50 +1324,46 @@ mod tests {
     #[test]
     fn test_merge_into_single_key() {
         let engine = ClueEngine::new(5, None).unwrap();
-        let mut target = FastSimulationData::new();
-        engine.initialize_fast_simulation_data(&mut target);
-        target.get_mut(0).unwrap()[0] = 1;
-        target.get_mut(0).unwrap()[1] = 2;
-        target.get_mut(0).unwrap()[2] = 3;
-        let mut source = FastSimulationData::new();
-        engine.initialize_fast_simulation_data(&mut source);
-        source.get_mut(0).unwrap()[0] = 7;
-        source.get_mut(0).unwrap()[1] = 8;
-        source.get_mut(0).unwrap()[2] = 9;
+        let mut target = FastSimulationData::new(&engine);
+        target.data.get_mut(0).unwrap()[0] = 1;
+        target.data.get_mut(0).unwrap()[1] = 2;
+        target.data.get_mut(0).unwrap()[2] = 3;
+        let mut source = FastSimulationData::new(&engine);
+        source.data.get_mut(0).unwrap()[0] = 7;
+        source.data.get_mut(0).unwrap()[1] = 8;
+        source.data.get_mut(0).unwrap()[2] = 9;
 
         ClueEngine::merge_into(&mut target, &source);
 
-        assert_eq!(target.get(0).unwrap(), &vec![8 as usize,10,12,0,0,0]);
+        assert_eq!(target.data.get(0).unwrap(), &vec![8 as usize,10,12,0,0,0]);
     }
 
     #[test]
     fn test_merge_into_multiple_keys() {
         let engine = ClueEngine::new(2, None).unwrap();
-        let mut target = FastSimulationData::new();
-        engine.initialize_fast_simulation_data(&mut target);
-        target.get_mut(0).unwrap()[0] = 1;
-        target.get_mut(0).unwrap()[1] = 2;
-        target.get_mut(0).unwrap()[2] = 3;
-        target.get_mut(1).unwrap()[0] = 4;
-        target.get_mut(1).unwrap()[1] = 6;
-        target.get_mut(1).unwrap()[2] = 8;
-        target.get_mut(3).unwrap()[0] = 9;
-        target.get_mut(3).unwrap()[1] = 7;
-        target.get_mut(3).unwrap()[2] = 3;
-        let mut source = FastSimulationData::new();
-        engine.initialize_fast_simulation_data(&mut source);
-        source.get_mut(0).unwrap()[0] = 7;
-        source.get_mut(0).unwrap()[1] = 8;
-        source.get_mut(0).unwrap()[2] = 9;
-        source.get_mut(2).unwrap()[0] = 11;
-        source.get_mut(2).unwrap()[1] = 13;
-        source.get_mut(2).unwrap()[2] = 12;
+        let mut target = FastSimulationData::new(&engine);
+        target.data.get_mut(0).unwrap()[0] = 1;
+        target.data.get_mut(0).unwrap()[1] = 2;
+        target.data.get_mut(0).unwrap()[2] = 3;
+        target.data.get_mut(1).unwrap()[0] = 4;
+        target.data.get_mut(1).unwrap()[1] = 6;
+        target.data.get_mut(1).unwrap()[2] = 8;
+        target.data.get_mut(3).unwrap()[0] = 9;
+        target.data.get_mut(3).unwrap()[1] = 7;
+        target.data.get_mut(3).unwrap()[2] = 3;
+        let mut source = FastSimulationData::new(&engine);
+        source.data.get_mut(0).unwrap()[0] = 7;
+        source.data.get_mut(0).unwrap()[1] = 8;
+        source.data.get_mut(0).unwrap()[2] = 9;
+        source.data.get_mut(2).unwrap()[0] = 11;
+        source.data.get_mut(2).unwrap()[1] = 13;
+        source.data.get_mut(2).unwrap()[2] = 12;
 
         ClueEngine::merge_into(&mut target, &source);
 
-        assert_eq!(target.get(0).unwrap(), &vec![8 as usize,10,12]);
-        assert_eq!(target.get(1).unwrap(), &vec![4 as usize,6,8]);
-        assert_eq!(target.get(2).unwrap(), &vec![11 as usize,13,12]);
-        assert_eq!(target.get(3).unwrap(), &vec![9 as usize,7,3]);
+        assert_eq!(target.data.get(0).unwrap(), &vec![8 as usize,10,12]);
+        assert_eq!(target.data.get(1).unwrap(), &vec![4 as usize,6,8]);
+        assert_eq!(target.data.get(2).unwrap(), &vec![11 as usize,13,12]);
+        assert_eq!(target.data.get(3).unwrap(), &vec![9 as usize,7,3]);
     }
 }
