@@ -1350,7 +1350,7 @@ mod tests {
 
         target.accumulate_from(&source);
 
-        assert_eq!(target.get_card_data(FromPrimitive::from_i32(0).unwrap()), vec![8 as usize,10,12,0,0,0]);
+        assert_eq!(target.get_card_data(FromPrimitive::from_i32(0).unwrap()), &vec![8 as usize,10,12,0,0,0][..]);
     }
 
     #[test]
@@ -1376,9 +1376,9 @@ mod tests {
 
         target.accumulate_from(&source);
 
-        assert_eq!(target.get_card_data(Card::ProfessorPlum), vec![8 as usize,10,12]);
-        assert_eq!(target.get_card_data(Card::ColonelMustard), vec![4 as usize,6,8]);
-        assert_eq!(target.get_card_data(Card::MrGreen), vec![11 as usize,13,12]);
-        assert_eq!(target.get_card_data(Card::MissScarlet), vec![9 as usize,7,3]);
+        assert_eq!(target.get_card_data(Card::ProfessorPlum), &vec![8 as usize,10,12][..]);
+        assert_eq!(target.get_card_data(Card::ColonelMustard), &vec![4 as usize,6,8][..]);
+        assert_eq!(target.get_card_data(Card::MrGreen), &vec![11 as usize,13,12][..]);
+        assert_eq!(target.get_card_data(Card::MissScarlet), &vec![9 as usize,7,3][..]);
     }
 }
