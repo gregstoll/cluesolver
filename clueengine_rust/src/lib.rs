@@ -55,9 +55,6 @@ impl FastSimulationData {
 
     fn increment_entry(self: &mut FastSimulationData, card: Card, player_index: usize) {
         self.data[(card as usize * self.num_players) + player_index] += 1;
-        /*let index = (card as usize * self.num_players) + player_index;
-        let x = self.data.get_unchecked_mut(index);
-        *x = *x + 1;*/
     }
 
     fn accumulate_from(self: &mut FastSimulationData, source: &FastSimulationData) {
@@ -105,8 +102,6 @@ pub enum CardType {
 //TODO - document these
 #[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Copy, Clone)]
 enum UpdateEngineMode {
-    //TODO - remove this
-    None,
     Minimal,
     All
 }
@@ -467,36 +462,30 @@ impl ClueEngine {
             else {
                 player.not_has_cards.insert(card);
             }
-            if update_engine != UpdateEngineMode::None {
-                changed_cards.insert(card);
-                self.examine_clauses(player_index, Some(card), changed_cards);
-            }
+            changed_cards.insert(card);
+            self.examine_clauses(player_index, Some(card), changed_cards);
         }
-        if update_engine == UpdateEngineMode::All  {
+        if update_engine == UpdateEngineMode::All {
             self.check_solution(Some(card), changed_cards);
         }
 
-        if update_engine != UpdateEngineMode::None {
-            if has_card && self.player_data[player_index].is_solution_player {
-                // We know we have no other cards in this category.
-                for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
-                    if other_card != card {
-                        self.learn_info_on_card_internal(player_index, other_card, false, update_engine, changed_cards);
-                    }
+        if has_card && self.player_data[player_index].is_solution_player {
+            // We know we have no other cards in this category.
+            for other_card in CardUtils::cards_of_type(CardUtils::card_type(card)) {
+                if other_card != card {
+                    self.learn_info_on_card_internal(player_index, other_card, false, update_engine, changed_cards);
                 }
             }
         }
     }
 
     // Requires that all cards be assigned
+    // Also requires that we've already checked there's no overlap between
+    // has_cards and not_has_cards
     fn is_consistent_after_all_cards_assigned(self: &mut ClueEngine) -> bool {
         let mut cards_seen = CardSet::new();
         for player in self.player_data.iter() {
             for &card in player.has_cards.iter() {
-                if player.not_has_cards.contains(&card) {
-                    // has card and doesn't have card
-                    return false;
-                }
                 if !cards_seen.insert(card) {
                     // Already seen this card in someone else's cards, so not consistent
                     return false;
@@ -974,7 +963,8 @@ impl ClueEngine {
         let mut temp_available_cards = available_cards.clone();
         temp_available_cards.shuffle(rng);
         let num_available_cards = temp_available_cards.len();
-        // Assign all values randomly.
+        // Assign all values randomly.  For performance, do minimal checking while doing this, then check
+        // everything at the end.
         let mut index = 0;
         for player_index in 0..engine.number_of_real_players() {
             let player = &engine.player_data[player_index];
@@ -989,9 +979,13 @@ impl ClueEngine {
                     let card_to_add = temp_available_cards[index];
                     index += 1;
                     // see if we're going to be inconsistent and exit early
+                    // This early return helps performance when we have to do a lot of simulations
+                    // because there are a lot of conditions to meet
                     if engine.player_data[player_index].not_has_cards.contains(card_to_add) {
                         return false;
                     }
+                    // This used to be a call to learn_info_on_card_internal(), but for performance
+                    // just do the core operation here.
                     engine.player_data[player_index].has_cards.insert(*card_to_add);
                 }
             }
