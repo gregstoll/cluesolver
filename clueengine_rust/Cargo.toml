@@ -17,6 +17,9 @@ rayon = "1.3"
 
 [profile.release]
 debug = true
+# https://deterministic.space/high-performance-rust.html
+lto = "fat"
+codegen-units = 1
 
 [dev-dependencies]
 criterion = "0.3"
