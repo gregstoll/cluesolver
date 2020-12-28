@@ -11,10 +11,10 @@ const MIN_CARDS = 3;
 const MAX_CARDS = 6;
 const DEFAULT_CARDS = 3;
 const TOTAL_CARDS_FOR_PLAYERS = 18;
-const _INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "MsWhite", "MrsPeacock"],
+const _INTERNAL_NAMES = [["ProfessorPlum", "ColonelMustard", "MrGreen", "MissScarlet", "DrOrchid", "MrsPeacock"],
                     ["Knife", "Candlestick", "Revolver", "LeadPipe", "Rope", "Wrench"],
                     ["Hall", "Conservatory", "DiningRoom", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "BilliardRoom"]];
-const _EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Ms. White", "Mrs. Peacock"],
+const _EXTERNAL_NAMES = [["Professor Plum", "Colonel Mustard", "Mr. Green", "Miss Scarlet", "Dr. Orchid", "Mrs. Peacock"],
                     ["Knife", "Candlestick", "Revolver", "Lead Pipe", "Rope", "Wrench"],
                     ["Hall", "Conservatory", "Dining Room", "Kitchen", "Study", "Library", "Ballroom", "Lounge", "Billiard Room"]];
 function compareCardIndexByCategory(card1: CardIndex, card2: CardIndex) {

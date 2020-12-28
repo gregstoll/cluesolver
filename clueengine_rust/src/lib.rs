@@ -73,7 +73,7 @@ pub enum Card {
     ColonelMustard,
     MrGreen,
     MissScarlet,
-    MsWhite,
+    DrOrchid,
     MrsPeacock,
     // weapons
     Knife,
@@ -1124,7 +1124,7 @@ mod tests {
 
     #[test]
     fn test_eliminate_extraneous_clauses_single() {
-        let mut clauses: Vec<CardSet> = vec![make_card_set(vec![Card::ProfessorPlum, Card::MsWhite])];
+        let mut clauses: Vec<CardSet> = vec![make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid])];
         let expected = clauses.clone();
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
@@ -1133,9 +1133,9 @@ mod tests {
     #[test]
     fn test_eliminate_extraneous_clauses_three_not_extraneous() {
         let mut clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Library, Card::Wrench]),
-            make_card_set(vec![Card::Conservatory, Card::MsWhite])];
+            make_card_set(vec![Card::Conservatory, Card::DrOrchid])];
         let expected = clauses.clone();
         PlayerData::eliminate_extraneous_clauses_possible_cards(&mut clauses);
         assert_eq!(expected, clauses);
@@ -1144,7 +1144,7 @@ mod tests {
     #[test]
     fn test_eliminate_extraneous_clauses_superset_first() {
         let mut clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Hall])];
@@ -1157,7 +1157,7 @@ mod tests {
     #[test]
     fn test_eliminate_extraneous_clauses_subset_first() {
         let mut clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Library, Card::Hall])];
@@ -1170,7 +1170,7 @@ mod tests {
     #[test]
     fn test_eliminate_extraneous_clauses_multiple_redundant_to_same_one() {
         let mut clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Library, Card::Hall]),
@@ -1185,7 +1185,7 @@ mod tests {
     #[test]
     fn test_eliminate_extraneous_clauses_multiple_redundant_to_different_ones() {
         let mut clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Library, Card::Hall]),
@@ -1202,7 +1202,7 @@ mod tests {
     #[test]
     fn test_transpose_clauses() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Hall])];
@@ -1211,7 +1211,7 @@ mod tests {
 
         assert_eq!(6, transposed.len());
         assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::ProfessorPlum).unwrap());
-        assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::MsWhite).unwrap());
+        assert_eq!(&make_usize_set(vec![0]), transposed.get(&Card::DrOrchid).unwrap());
         assert_eq!(&make_usize_set(vec![1, 3]), transposed.get(&Card::Library).unwrap());
         assert_eq!(&make_usize_set(vec![1, 2]), transposed.get(&Card::Wrench).unwrap());
         assert_eq!(&make_usize_set(vec![1, 2]), transposed.get(&Card::Conservatory).unwrap());
@@ -1221,7 +1221,7 @@ mod tests {
     #[test]
     fn test_remove_card_from_clauses() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::Library, Card::Wrench, Card::Conservatory]),
             make_card_set(vec![Card::Conservatory, Card::Wrench]),
             make_card_set(vec![Card::Library, Card::Hall]),
@@ -1230,7 +1230,7 @@ mod tests {
         let removed = ClueEngine::remove_card_from_clauses(&clauses, Card::Wrench);
 
         assert_eq!(5, removed.len());
-        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]), removed[0]);
+        assert_eq!(make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]), removed[0]);
         assert_eq!(make_card_set(vec![Card::Library, Card::Conservatory]), removed[1]);
         assert_eq!(make_card_set(vec![Card::Conservatory]), removed[2]);
         assert_eq!(make_card_set(vec![Card::Library, Card::Hall]), removed[3]);
@@ -1240,7 +1240,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_one_card() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library]),
             make_card_set(vec![Card::ProfessorPlum])];
         assert_eq!(true, ClueEngine::can_satisfy(&clauses, 1));
@@ -1249,7 +1249,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_no_cards() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library]),
             make_card_set(vec![Card::ProfessorPlum])];
         assert_eq!(false, ClueEngine::can_satisfy(&clauses, 0));
@@ -1258,7 +1258,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_extra_cards() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library]),
             make_card_set(vec![Card::ProfessorPlum])];
         assert_eq!(true, ClueEngine::can_satisfy(&clauses, 2));
@@ -1267,7 +1267,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_two_cards() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(true, ClueEngine::can_satisfy(&clauses, 2));
@@ -1276,7 +1276,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_needs_two_cards_but_only_room_for_one() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(false, ClueEngine::can_satisfy(&clauses, 1));
@@ -1285,7 +1285,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_needs_one_card_if_careful() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid, Card::Hall]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(true, ClueEngine::can_satisfy(&clauses, 1));
@@ -1300,7 +1300,7 @@ mod tests {
     #[test]
     fn test_can_satisfy_empty_clause() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid, Card::Hall]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
             make_card_set(vec![])];
         assert_eq!(false, ClueEngine::can_satisfy(&clauses, 2));
@@ -1309,7 +1309,7 @@ mod tests {
     #[test]
     fn test_remove_clauses_with_indices_empty() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid, Card::Hall]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         let new_clauses = ClueEngine::remove_clauses_with_indices(&clauses, &HashSet::new());
@@ -1320,14 +1320,14 @@ mod tests {
     #[test]
     fn test_remove_clauses_with_indices_multiple() {
         let clauses: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid, Card::Hall]),
             make_card_set(vec![Card::ProfessorPlum, Card::Library, Card::Ballroom, Card::Hall]),
             make_card_set(vec![Card::Hall]),
-            make_card_set(vec![Card::Library, Card::MsWhite, Card::Candlestick])];
+            make_card_set(vec![Card::Library, Card::DrOrchid, Card::Candlestick])];
         let new_clauses = ClueEngine::remove_clauses_with_indices(&clauses, &make_usize_set(vec![1, 3]));
 
         let expected: Vec<CardSet> = vec![
-            make_card_set(vec![Card::ProfessorPlum, Card::MsWhite, Card::Hall]),
+            make_card_set(vec![Card::ProfessorPlum, Card::DrOrchid, Card::Hall]),
             make_card_set(vec![Card::Hall])];
         assert_eq!(expected, new_clauses);
     }
