@@ -118,6 +118,7 @@ pub struct CardUtils {
 }
 
 impl CardUtils {
+    // TODO - use TryFrom
     pub fn card_from_char(ch: char) -> Result<Card, String> {
         let index = ch as i32 - 'A' as i32;
         if index < 0 || index >= CARD_LAST {
@@ -126,6 +127,7 @@ impl CardUtils {
         return FromPrimitive::from_i32(index).ok_or(format!("Invalid card character '{}'", ch));
     }
 
+    // TODO - use From
     pub fn char_from_card(card: Card) -> char {
         let index = card as u8 + 'A' as u8;
         return index as char;
