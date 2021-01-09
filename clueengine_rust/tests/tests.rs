@@ -17,7 +17,7 @@ mod tests {
 
     #[test]
     fn test_cards_of_type_suspect() {
-        let expected = vec![Card::ProfessorPlum, Card::ColonelMustard, Card::MrGreen, Card::MissScarlet, Card::MsWhite, Card::MrsPeacock];
+        let expected = vec![Card::ProfessorPlum, Card::ColonelMustard, Card::MrGreen, Card::MissScarlet, Card::DrOrchid, Card::MrsPeacock];
         assert_eq!(expected, CardUtils::cards_of_type(CardType::Suspect).collect::<Vec<Card>>());
     }
 
@@ -82,7 +82,7 @@ mod tests {
         assert_eq!(Some(true), clue_engine.player_data[1].has_card(Card::ProfessorPlum));
         assert_eq!(Some(false), clue_engine.player_data[1].has_card(Card::ColonelMustard));
         assert_eq!(2, clue_engine.player_data[1].possible_cards.len());
-        assert_eq!(make_card_set(vec![Card::MrGreen, Card::MissScarlet, Card::MsWhite]), clue_engine.player_data[1].possible_cards[0]);
+        assert_eq!(make_card_set(vec![Card::MrGreen, Card::MissScarlet, Card::DrOrchid]), clue_engine.player_data[1].possible_cards[0]);
         assert_eq!(make_card_set(vec![Card::MrsPeacock, Card::Knife, Card::Candlestick]), clue_engine.player_data[1].possible_cards[1]);
     }
 
@@ -261,7 +261,7 @@ mod tests {
         clue_engine.learn_info_on_card(0, Card::ColonelMustard, true, true);
         clue_engine.learn_info_on_card(1, Card::MrGreen, true, true);
         clue_engine.learn_info_on_card(2, Card::MissScarlet, true, true);
-        clue_engine.learn_info_on_card(3, Card::MsWhite, true, true);
+        clue_engine.learn_info_on_card(3, Card::DrOrchid, true, true);
         clue_engine.learn_info_on_card(4, Card::MrsPeacock, true, true);
 
         assert_eq!(Some(true), clue_engine.player_data[clue_engine.number_of_real_players()].has_card(Card::ProfessorPlum));
