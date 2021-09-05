@@ -9,7 +9,7 @@
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
     "@types/react-tabs": "^2.3.2",
-    "immer": ">=8.0.1",
+    "immer": ">=9.0.6",
     "postcss": ">=8.2.10",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
