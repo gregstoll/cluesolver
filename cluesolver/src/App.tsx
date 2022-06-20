@@ -2,7 +2,6 @@ import React, { Component, ChangeEvent } from 'react';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import "react-tabs/style/react-tabs.css";
 import './App.css';
-import { isNullOrUndefined, isNull, isUndefined } from 'util';
 
 const SCRIPT_NAME = "clue.cgi";
 const MIN_PLAYERS = 3;
@@ -349,7 +348,7 @@ class History extends React.Component<HistoryProps, {}> {
                     }
                     else {
                         description += " - refuted by " + this.props.playerInfos[event.refuter_index].name + " with card ";
-                        if (isNull(event.refuted_card_index) || isNone(event.refuted_card_index)) {
+                        if (event.refuted_card_index === null || isNone(event.refuted_card_index)) {
                             description += "Unknown";
                         }
                         else {
@@ -884,7 +883,7 @@ class App extends Component<{}, AppState> {
 
     cardIndexFromInternalName = (name: string): CardIndex => {
         let cardIndex = INTERNAL_NAME_TO_CARD_INDEX.get(name);
-        if (isUndefined(cardIndex)) {
+        if (cardIndex === undefined) {
             return NONE_CARD_INDEX;
         }
         return cardIndex;
@@ -986,7 +985,7 @@ class App extends Component<{}, AppState> {
     }
 
     addToHistory = (historyEvent: HistoryEvent) => {
-        if (isNullOrUndefined(this.state.session)) {
+        if (this.state.session === null || this.state.session === undefined) {
             alert("Session is null when adding history entry?!");
             return;
         }
