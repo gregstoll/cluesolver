@@ -314,8 +314,6 @@ pub struct ClueEngine {
 }
 
 impl ClueEngine {
-    pub const NUM_SIMULATIONS: i32 = 20000;
-
     pub fn new(number_of_players: u8, number_of_cards_per_player: Option<&Vec<u8>>) -> Result<ClueEngine, String> {
         let real_cards_per_player: &Vec<u8>;
         let allocated_cards_per_player: Vec<u8>;
@@ -835,7 +833,9 @@ impl ClueEngine {
         }
     }
 
-    pub fn do_simulation(self: &Self) -> (SimulationData, i32) {
+    pub fn do_simulation(self: &Self, random_solutions: bool) -> (SimulationData, i32) {
+        let num_simulations: i32 = if random_solutions {100000} else {20000};
+
         const SIMULATION_IN_PARALLEL: bool = true;
         const NUM_SIMULATIONS_TO_SPLIT: i32 = 1000;
         if self.player_data.iter().any(|player| player.num_cards == None) {
@@ -865,83 +865,120 @@ impl ClueEngine {
             }
         }
         let number_of_solutions = solution_possibilities.values().map(|cards| cards.len() as i32).product::<i32>();
-        let iterations_per_solution = Self::NUM_SIMULATIONS / number_of_solutions;
+        let iterations_per_solution = num_simulations / number_of_solutions;
         let mut solution_engines: Vec<(ClueEngine, CardSet, i32)> = vec![];
-        for card1 in solution_possibilities.get(&CardType::Suspect).unwrap() {
-            for card2 in solution_possibilities.get(&CardType::Weapon).unwrap() {
-                for card3 in solution_possibilities.get(&CardType::Room).unwrap() {
-                    let mut engine_copy = self.clone();
-                    // To avoid solution biasing, we need to gather the available_cards before we put in the solution.
-                    // Otherwise see the test test_simulation_monty_hall_no_player0
-                    // In that case, ProfessorPlum only has two possibilities, and once we pick it (or something else)
-                    // for the solution it automatically goes to the other player.
-                    // But we should be throwing out a lot of those simulations.
-                    let mut available_cards: CardSet = CardUtils::all_cards().collect();
-                    for player in engine_copy.player_data.iter() {
-                        for has_card in player.has_cards.iter() {
-                            available_cards.remove(has_card);
+        if random_solutions {
+            let mut available_cards: CardSet = CardUtils::all_cards().collect();
+            for player in self.player_data.iter() {
+                for has_card in player.has_cards.iter() {
+                    available_cards.remove(has_card);
+                }
+            }
+            let mut rng = thread_rng();
+            for _ in 0..num_simulations {
+                let mut engine_copy = self.clone();
+                let mut available_card_vec = available_cards.clone();
+                // TODO - make sure these aren't empty
+                let card1 = solution_possibilities.get(&CardType::Suspect).unwrap().choose(&mut rng).unwrap();
+                let card2 = solution_possibilities.get(&CardType::Weapon).unwrap().choose(&mut rng).unwrap();
+                let card3 = solution_possibilities.get(&CardType::Room).unwrap().choose(&mut rng).unwrap();
+                available_card_vec.remove(card1);
+                available_card_vec.remove(card2);
+                available_card_vec.remove(card3);
+                let available_card_vec = available_card_vec.iter().collect::<Vec<&Card>>();
+                // Call the internal versions to avoid a few allocations
+                let mut ignored_changed_cards = CardSet::new();
+                engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card1, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card2, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card3, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                if ClueEngine::do_one_simulation(&mut engine_copy, &available_card_vec, &mut rng) {
+                    // Results were consistent, so count them
+                    for player_index in 0..engine_copy.player_data.len() {
+                        for card in engine_copy.player_data[player_index].has_cards.iter() {
+                            fast_simulation_data.increment_entry(*card, player_index);
                         }
-                    }
-                    available_cards.remove(card1);
-                    available_cards.remove(card2);
-                    available_cards.remove(card3);
-
-                    // Call the internal versions to avoid a few allocations
-                    let mut ignored_changed_cards = CardSet::new();
-                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card1, true, UpdateEngineMode::All, &mut ignored_changed_cards);
-                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card2, true, UpdateEngineMode::All, &mut ignored_changed_cards);
-                    engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card3, true, UpdateEngineMode::All, &mut ignored_changed_cards);
-                    if SIMULATION_IN_PARALLEL {
-                        // Don't split on just cards, because of there are only a few solution possibilities
-                        // we won't get good parallelism.
-                        let mut temp_iterations_per_solution = iterations_per_solution;
-                        while temp_iterations_per_solution > 0 {
-                            solution_engines.push((engine_copy.clone(), available_cards.clone(), min(NUM_SIMULATIONS_TO_SPLIT, temp_iterations_per_solution)));
-                            temp_iterations_per_solution -= NUM_SIMULATIONS_TO_SPLIT;
-                        }
-                    }
-                    else {
-                        solution_engines.push((engine_copy, available_cards, iterations_per_solution));
                     }
                 }
             }
-        }
-
-        let simulations_per_iteration: i32 = solution_engines.iter().map(|data| data.2).sum();
-        let total_number_of_simulations;
-        if SIMULATION_IN_PARALLEL {
-            let mut iterations = 0;
-            const MAX_ITERATIONS: i32 = 100;
-            while iterations < MAX_ITERATIONS && fast_simulation_data.num_simulations() < 1000 {
-                iterations += 1;
-                let results: Vec<FastSimulationData> = solution_engines.par_iter().map(|solution_data| {
-                    let mut local_simulation_data = FastSimulationData::new(self);
-                    
-                    let engine = &solution_data.0;
-                    let available_cards = &solution_data.1;
-                    let iterations = solution_data.2;
-                    Self::gather_simulation_data(&mut local_simulation_data, &engine, available_cards, iterations);
-                    local_simulation_data
-                }).collect();
-                for result in results {
-                    fast_simulation_data.accumulate_from(&result);
-                }
-            }
-            total_number_of_simulations = iterations * simulations_per_iteration;
+            return (SimulationData::from(&fast_simulation_data), num_simulations);
         }
         else {
-            let mut iterations = 0;
-            const MAX_ITERATIONS: i32 = 100;
-            while iterations < MAX_ITERATIONS && fast_simulation_data.num_simulations() < 1000 {
-                iterations += 1;
-                for (engine, available_cards, iterations) in &solution_engines {
-                    Self::gather_simulation_data(&mut fast_simulation_data, &engine, &available_cards, *iterations);
+            for card1 in solution_possibilities.get(&CardType::Suspect).unwrap() {
+                for card2 in solution_possibilities.get(&CardType::Weapon).unwrap() {
+                    for card3 in solution_possibilities.get(&CardType::Room).unwrap() {
+                        let mut engine_copy = self.clone();
+                        // To avoid solution biasing, we need to gather the available_cards before we put in the solution.
+                        // Otherwise see the test test_simulation_monty_hall_no_player0
+                        // In that case, ProfessorPlum only has two possibilities, and once we pick it (or something else)
+                        // for the solution it automatically goes to the other player.
+                        // But we should be throwing out a lot of those simulations.
+                        let mut available_cards: CardSet = CardUtils::all_cards().collect();
+                        for player in engine_copy.player_data.iter() {
+                            for has_card in player.has_cards.iter() {
+                                available_cards.remove(has_card);
+                            }
+                        }
+                        available_cards.remove(card1);
+                        available_cards.remove(card2);
+                        available_cards.remove(card3);
+
+                        // Call the internal versions to avoid a few allocations
+                        let mut ignored_changed_cards = CardSet::new();
+                        engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card1, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                        engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card2, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                        engine_copy.learn_info_on_card_internal(engine_copy.number_of_real_players(), *card3, true, UpdateEngineMode::All, &mut ignored_changed_cards);
+                        if SIMULATION_IN_PARALLEL {
+                            // Don't split on just cards, because if there are only a few solution possibilities
+                            // we won't get good parallelism.
+                            let mut temp_iterations_per_solution = iterations_per_solution;
+                            while temp_iterations_per_solution > 0 {
+                                solution_engines.push((engine_copy.clone(), available_cards.clone(), min(NUM_SIMULATIONS_TO_SPLIT, temp_iterations_per_solution)));
+                                temp_iterations_per_solution -= NUM_SIMULATIONS_TO_SPLIT;
+                            }
+                        }
+                        else {
+                            solution_engines.push((engine_copy, available_cards, iterations_per_solution));
+                        }
+                    }
                 }
             }
-            total_number_of_simulations = iterations * simulations_per_iteration;
-        }
 
-        return (SimulationData::from(&fast_simulation_data), total_number_of_simulations);
+            let simulations_per_iteration: i32 = solution_engines.iter().map(|data| data.2).sum();
+            let total_number_of_simulations;
+            if SIMULATION_IN_PARALLEL {
+                let mut iterations = 0;
+                const MAX_ITERATIONS: i32 = 100;
+                while iterations < MAX_ITERATIONS && fast_simulation_data.num_simulations() < 1000 {
+                    iterations += 1;
+                    let results: Vec<FastSimulationData> = solution_engines.par_iter().map(|solution_data| {
+                        let mut local_simulation_data = FastSimulationData::new(self);
+                        
+                        let engine = &solution_data.0;
+                        let available_cards = &solution_data.1;
+                        let iterations = solution_data.2;
+                        Self::gather_simulation_data(&mut local_simulation_data, &engine, available_cards, iterations);
+                        local_simulation_data
+                    }).collect();
+                    for result in results {
+                        fast_simulation_data.accumulate_from(&result);
+                    }
+                }
+                total_number_of_simulations = iterations * simulations_per_iteration;
+            }
+            else {
+                let mut iterations = 0;
+                const MAX_ITERATIONS: i32 = 100;
+                while iterations < MAX_ITERATIONS && fast_simulation_data.num_simulations() < 1000 {
+                    iterations += 1;
+                    for (engine, available_cards, iterations) in &solution_engines {
+                        Self::gather_simulation_data(&mut fast_simulation_data, &engine, &available_cards, *iterations);
+                    }
+                }
+                total_number_of_simulations = iterations * simulations_per_iteration;
+            }
+
+            return (SimulationData::from(&fast_simulation_data), total_number_of_simulations);
+        }
     }
 
     // Note that we do at least 20,000 of these, so performance is very important!

@@ -17,7 +17,7 @@ use clueengine::ClueEngine;
 
 fn simulate_single() {
     let clue_engine = ClueEngine::load_from_string("63A-.3-A.3-A.3-A.3-A.3-A.3-A.").unwrap();
-    clue_engine.do_simulation();
+    clue_engine.do_simulation(false);
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

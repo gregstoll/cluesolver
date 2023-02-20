@@ -376,7 +376,7 @@ mod tests {
         let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, true, true);
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
         let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         assert!(plum_data[1] > 0);
         for i in 0..(clue_engine.number_of_real_players() + 1) {
@@ -392,7 +392,7 @@ mod tests {
         let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_info_on_card(1, Card::ProfessorPlum, false, true);
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
 
         let plum_data = simulation_data.0.get(&Card::ProfessorPlum).unwrap();
         assert_eq!(0, plum_data[1]);
@@ -408,7 +408,7 @@ mod tests {
     fn test_simulation_trickycase1_has_results() {
         let clue_engine = ClueEngine::load_from_string("36CDKLQR-ABEFGHIJMNOPSTU.6T-BCDFGIKLQRS.6BF-CDKLPQRT.3-BCDFKLQRT.").unwrap();
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
 
         for card in simulation_data.0.keys() {
             let number_of_simulations: usize = simulation_data.0.get(card).unwrap().iter().sum();
@@ -423,7 +423,7 @@ mod tests {
     fn test_simulation_trickycase2_has_results() {
         let clue_engine = ClueEngine::load_from_string("45CPQRS-ABDEFGHIJKLMNOTU.5AGIMT-BCDEFHJKLNOPQRSU.4FK-ACDGIJLMPQRST-EO.4DL-ABCFGIJKMPQRST.3J-ACDFGHIKLMPQRST.").unwrap();
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
 
         for card in simulation_data.0.keys() {
             let number_of_simulations: usize = simulation_data.0.get(card).unwrap().iter().sum();
@@ -436,7 +436,7 @@ mod tests {
     fn test_simulation_clauses_point_to_card() {
         let clue_engine = ClueEngine::load_from_string("36-GM.6-GM-AHN-AIO-AJP.6-GM.3GM-HIJKLNOPQRSTU.").unwrap();
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
 
         // In this game player with index 1 has a bunch of clauses that include Professor Plum and other cards,
         // so it's most likely he has that card
@@ -452,7 +452,7 @@ mod tests {
         let mut clue_engine = ClueEngine::new(6, None).unwrap();
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(5), None);
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
 
         // In this game we know players 1-4 don't have ProfessorPlum.
         // Player 5 should have a high chance of having it
@@ -478,7 +478,7 @@ mod tests {
         clue_engine.learn_info_on_card(0, Card::ProfessorPlum, false, true);
         clue_engine.learn_suggest(0, Card::ProfessorPlum, Card::Knife, Card::Hall, Some(5), None);
 
-        let simulation_data = clue_engine.do_simulation();
+        let simulation_data = clue_engine.do_simulation(false);
 
         // In this game we know players 0-4 don't have ProfessorPlum.
         // Player 5 should have a high chance of having it

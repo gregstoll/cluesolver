@@ -103,7 +103,7 @@ fn process_query_string(query: &str) -> Result<json::JsonValue, String> {
         });
     }
     if action == "simulate" {
-        let simulation_data = engine.do_simulation();
+        let simulation_data = engine.do_simulation(false);
         return Ok(json::object! {
             "simData": format_simulation_data(&simulation_data.0),
             "totalNumSimulations": simulation_data.1
